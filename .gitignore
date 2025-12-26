@@ -1,0 +1,17 @@
+# ===== OS / Editor =====
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# ===== Docker =====
+.env
+docker/.env
+docker/**/.env
+
+# Docker volumes（使っている場合）
+docker/mysql/data/
+docker/redis/data/
+
+# ===== Logs =====
+*.log
