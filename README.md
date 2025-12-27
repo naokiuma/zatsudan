@@ -1,3 +1,6 @@
+## .envについて
+src/.envに各種情報を設定すること（topディレクトリのは不使用）
+
 ## 起動方法
 ```
 docker compose up -d --build
@@ -24,4 +27,19 @@ docker compose exec node npm install
 ## 以下にアクセス
 ```
 http://localhost:8080/
+```
+
+
+## マイグレーション追加時の手順
+例：postsテーブルを作る場合
+```
+docker compose exec app php artisan make:migration create_posts_table
+```
+マイグレーション実行（差分だけ反映）
+```
+docker compose exec app php artisan migrate
+```
+どこまで実行済みか確認したい場合
+```
+docker compose exec app php artisan migrate:status
 ```
