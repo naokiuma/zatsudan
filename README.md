@@ -33,7 +33,7 @@ http://localhost:8080/
 ## マイグレーション追加時の手順
 例：postsテーブルを作る場合
 ```
-docker compose exec app php artisan make:migration create_posts_table
+docker compose exec app php artisan make:migration create_posts_table --create=posts
 ```
 マイグレーション実行（差分だけ反映）
 ```
@@ -42,4 +42,14 @@ docker compose exec app php artisan migrate
 どこまで実行済みか確認したい場合
 ```
 docker compose exec app php artisan migrate:status
+```
+直前のmigrationだけ戻す
+```
+docker compose exec app php artisan migrate:rollback
+```
+
+## モデルについて
+モデルを作成する場合
+```
+docker compose exec app php artisan make:model モデル名
 ```
