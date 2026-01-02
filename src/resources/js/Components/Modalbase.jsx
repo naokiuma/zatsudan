@@ -1,4 +1,4 @@
-// resources/js/components/ModalBase.jsx
+// resources/js/components/Modalbase.jsx
 import React from "react";
 
 export default function ModalBase({ open, onClose, title, children }) {

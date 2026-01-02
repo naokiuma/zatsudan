@@ -173,8 +173,6 @@ export default function Top(props) {
   };
   const todayFormatted = props?.todayFormatted;
 
-  const max_show_people = 5;
-
   const mockComments = useMemo(() => {
 	// props.comments が来たら差し替えるだけでOK
 	const base = props?.comments?.length ? props.comments : makeMockComments();
@@ -324,7 +322,7 @@ export default function Top(props) {
 
   /**
    * 
-   * 投稿モーダルの送信処理(現在はdbに保存せず、力内容を元に新しい「人」を作成して画面に追加するだけ)
+   * 投稿モーダルの送信処理(現在はdbに保存せず、入力内容を元に新しい「人」を作成して画面に追加するだけ)
    */
   function submitPost(e) {
 	e.preventDefault();
