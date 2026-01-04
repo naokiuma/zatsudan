@@ -1,36 +1,44 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use Illuminate\Http\Request;
 use App\Models\Theme;
 use Carbon\Carbon;
 use Inertia\Inertia;
 
 class TopController extends Controller
 {
-	public function index()
-	{
-		$todayJst = Carbon::now('Asia/Tokyo');
-		//日本時間としてxx年xx月xx日と表示する
-		$todayFormatted = $todayJst->format('Y年m月d日');
+public function index(Request $request)
+{
+    // ?day=20260104 があればそれを使う
+    $dayParam = $request->query('day');
 
+    if ($dayParam) {
+        // YYYYMMDD を想定
+        $targetDayJst = Carbon::createFromFormat(
+            'Ymd',
+            $dayParam,
+            'Asia/Tokyo'
+        );
+    } else {
+        $targetDayJst = Carbon::now('Asia/Tokyo');
+    }
 
-		// 日本時間の今日の開始・終了を UTC に変換
-		$startUtc = $todayJst->copy()->startOfDay()->utc();
-		$endUtc   = $todayJst->copy()->endOfDay()->utc();
+    $todayFormatted = $targetDayJst->format('Y年m月d日');
 
-		// 今日のテーマを取得
-		$todayTheme = Theme::whereBetween('created_at', [$startUtc, $endUtc])
-			->latest('created_at')
-			->first(); // なければ null
+    // JSTの開始・終了 → UTC
+    $startUtc = $targetDayJst->copy()->startOfDay()->utc();
+    $endUtc   = $targetDayJst->copy()->endOfDay()->utc();
 
-		// var_dump($todayTheme); // デバッグ用
-		// exit;
+    $todayTheme = Theme::whereBetween('created_at', [$startUtc, $endUtc])
+        ->latest('created_at')
+        ->first();
 
-		return Inertia::render('Top', [
-			'todayTheme' => $todayTheme, // まずはモック
-			'comments' => [],
-			'todayFormatted' => $todayFormatted,
-		]);
-	}
+    return Inertia::render('Top', [
+        'todayTheme' => $todayTheme,
+        'comments' => [],
+        'todayFormatted' => $todayFormatted,
+        'day' => $targetDayJst->format('Ymd'),
+    ]);
+}
 }
