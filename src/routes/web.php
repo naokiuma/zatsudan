@@ -15,7 +15,8 @@ use Inertia\Inertia;
 //     ]);
 // });
 
-Route::get('/', [TopController::class, 'index']);
+Route::get('/', [TopController::class, 'index'])->name('top');
+Route::post('/comments', [TopController::class, 'store'])->name('comments.store');
 
 
 Route::get('/dashboard', function () {
