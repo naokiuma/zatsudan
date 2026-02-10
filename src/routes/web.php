@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\TopController;
+use App\Http\Controllers\StaticController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -16,7 +17,11 @@ use Inertia\Inertia;
 // });
 
 Route::get('/', [TopController::class, 'index'])->name('top');
+Route::get('/canvas', [TopController::class, 'canvas'])->name('canvas');
+
 Route::post('/comments', [TopController::class, 'store'])->name('comments.store');
+
+Route::get('/about', [StaticController::class, 'about'])->name('about');
 
 
 Route::get('/dashboard', function () {

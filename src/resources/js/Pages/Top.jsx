@@ -1,853 +1,912 @@
-// resources/js/Pages/Top.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Head, router } from "@inertiajs/react";
-// import { Inertia } from "@inertiajs/inertia";
-import ModalBase from "../Components/ModalBase.jsx";
-
-// 6択アバター（絵文字で仮）
-//アバターidが1〜6に対応
-const AVATARS = [
-    { id: 1, emoji: "🙂" },
-    { id: 2, emoji: "😎" },
-    { id: 3, emoji: "🥸" },
-    { id: 4, emoji: "🐶" },
-    { id: 5, emoji: "🐱" },
-    { id: 6, emoji: "🦊" },
-];
-
-const GENDERS = [
-    { value: "unknown", label: "未選択" },
-    { value: "male", label: "男性" },
-    { value: "female", label: "女性" },
-    { value: "other", label: "その他" },
-];
-const AGES = [
-    { value: "10s", label: "10代" },
-    { value: "20s", label: "20代" },
-    { value: "30s", label: "30代" },
-    { value: "40s", label: "40代" },
-    { value: "50s", label: "50代" },
-    { value: "60s+", label: "60代+" },
-];
-
-const THEME_KEY = "zatsudan_theme";
-
-function shiftDay(yyyymmdd, diff) {
-    const y = Number(yyyymmdd.slice(0, 4));
-    const m = Number(yyyymmdd.slice(4, 6)) - 1;
-    const d = Number(yyyymmdd.slice(6, 8));
-    const date = new Date(y, m, d);
-    date.setDate(date.getDate() + diff);
-
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(
-        date.getDate()
-    )}`;
-}
+import { styles } from "./Top.styles";
+import "./Top.css";
 
 /**
- * n を min〜max の範囲に収める
+ * MVP: 15点 / 右サイドメニュー(普段は閉) / 下タイムライン
+ * DB設計っぽい「テーブル構造（mock）」から状態を合成して描画する版
+ *
+ * 追加:
+ * - 自分（currentUserId）の doing 切り替え
+ * - 自分の最新 doing へコメント投稿
+ * - 他人の「今の doing」にもコメント投稿（author_user_id で誰が書いたか管理）
  */
+
+const CURRENT_USER_ID = 1; // なお
+
+// =========================
+// Mock "DB tables"
+// =========================
+const DOINGS = [
+    { key: "study", label: "勉強", emoji: "📚", color: "#3B82F6" },
+    { key: "movie", label: "映画鑑賞", emoji: "🍿", color: "#F97316" },
+    { key: "work", label: "仕事", emoji: "💻", color: "#10B981" },
+    { key: "game", label: "ゲーム", emoji: "🎮", color: "#EC4899" },
+    { key: "clean", label: "お掃除", emoji: "🧹", color: "#A855F7" },
+    { key: "think", label: "考え中", emoji: "💭", color: "#F59E0B" },
+];
+
+const USERS = [
+    { id: 1, name: "なお" },
+    { id: 2, name: "さくら" },
+    { id: 3, name: "けんた" },
+    { id: 4, name: "ゆい" },
+    { id: 5, name: "たくみ" },
+    { id: 6, name: "みお" },
+    { id: 7, name: "りり" },
+    { id: 8, name: "けんと" },
+    { id: 9, name: "まい" },
+    { id: 10, name: "あずき" },
+    { id: 11, name: "しんじ" },
+    { id: 12, name: "あきら" },
+    { id: 13, name: "さとし" },
+    { id: 14, name: "みほ" },
+    { id: 15, name: "れん" },
+];
+
+// =========================
+// Utils
+// =========================
+
+/** 配列からランダムに1件取る */
+function pick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/** 数値を min〜max に収める */
 function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
 }
 
-/**
- * min〜max の間の整数をランダムで返す
- */
-function randInt(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+/** doing key から表示用情報（絵文字・色・ラベル）を引く */
+function doingInfo(key) {
+    return DOINGS.find((d) => d.key === key) ?? DOINGS[0];
 }
 
 /**
- * 配列からランダムに1つ選ぶ
+ * started_at (timestamp) から
+ * 「どれくらい前から doing してるか」を表示用文字列にする
  */
-function pickOne(arr) {
-    return arr[Math.floor(Math.random() * arr.length)];
+/**
+ * started_at (timestamp) から
+ * 「HH:MM から〜」形式の表示文字列を作る
+ * 例: 14:32 から〜
+ */
+function formatDoingStartTime(startedAt) {
+    if (!startedAt) return "";
+
+    const d = new Date(startedAt);
+
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+
+    return `${hh}:${mm} から〜`;
 }
 
-/** 初期テーマ取得 */
-function getInitialTheme() {
-    try {
-        const saved = localStorage.getItem(THEME_KEY);
-        if (saved === "dark" || saved === "light") return saved;
-        return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches
-            ? "dark"
-            : "light";
-    } catch {
-        return "dark";
+// =========================
+// Mock data builders
+// =========================
+
+/**
+ * 点の初期配置（重なりにくく）
+ * avatar_states テーブル相当を作る
+ */
+function buildInitialAvatarStates(userIds) {
+    const W = 980;
+    const H = 560;
+    const minDist = 62;
+
+    const points = [];
+    const genPoint = () => ({
+        x: Math.random() * (W - 120) + 60,
+        y: Math.random() * (H - 120) + 60,
+    });
+
+    for (let i = 0; i < userIds.length; i++) {
+        let p = genPoint();
+        let tries = 0;
+        while (
+            points.some((q) => Math.hypot(p.x - q.x, p.y - q.y) < minDist) &&
+            tries < 60
+        ) {
+            p = genPoint();
+            tries++;
+        }
+        points.push(p);
     }
-}
 
-/** モックコメント生成 */
-function makeMockComments() {
-    return [
-        {
-            id: 1,
-            name: "山田太郎",
-            body: "最近うまいラーメン屋見つけた…でも店名忘れたw",
-            gender: "male",
-            age_range: "30s",
-            avatar: "😎",
-        },
-        {
-            id: 2,
-            name: "佐藤花子",
-            body: "年末の空気、ちょっと好き。静かで。",
-            gender: "female",
-            age_range: "20s",
-            avatar: "🙂",
-        },
-        {
-            id: 3,
-            name: "鈴木一郎",
-            body: "仕事の合間のコーヒーが一番うまい説ある。",
-            gender: "unknown",
-            age_range: "40s",
-            avatar: "🥸",
-        },
-        {
-            id: 4,
-            name: "田中次郎",
-            body: "ホゲホゲ。",
-            gender: "unknown",
-            age_range: "40s",
-            avatar: "🥸",
-        },
-        {
-            id: 5,
-            name: "高橋三郎",
-            body: "ふぎゃふぎゃ",
-            gender: "unknown",
-            age_range: "40s",
-            avatar: "🥸",
-        },
-    ];
+    return userIds.map((userId, idx) => ({
+        user_id: userId,
+        x: points[idx].x,
+        y: points[idx].y,
+    }));
 }
 
 /**
- * 人（バブル）の初期位置生成
- * 画面サイズに依存しない相対座標（%）で管理
+ * 初期の user_doings / doing_messages を作る
+ * - doing_messages は author_user_id を持ち、誰が書いたか分かるようにする
  */
-function spawnPerson(baseComment) {
+function buildInitialUserDoingsAndMessages() {
     const now = Date.now();
-    return {
-        key: crypto?.randomUUID?.() ?? `${Date.now()}_${Math.random()}`,
-        comment: baseComment,
-        x: randInt(10, 90), // %
-        y: randInt(25, 85), // %
-        size: randInt(54, 72), // px
-        drift: randInt(-10, 10), // ふわっと横揺れ用
-        bornAt: Date.now(),
-        nextMoveAt: now + randInt(1000, 5000), // 1〜5秒後
-    };
+    const user_doings = [];
+    const doing_messages = [];
+
+    USERS.forEach((u, i) => {
+        const d1 = pick(DOINGS);
+        const d2 = pick(DOINGS.filter((d) => d.key !== d1.key));
+
+        const ud1 = {
+            id: `ud-${u.id}-a`,
+            user_id: u.id,
+            doing_key: d1.key,
+            started_at: now - (i + 1) * 1000 * 30,
+        };
+        user_doings.push(ud1);
+
+        const ud2 = {
+            id: `ud-${u.id}-b`,
+            user_id: u.id,
+            doing_key: d2.key,
+            started_at: now - (i + 1) * 1000 * 60 * 20,
+        };
+        user_doings.push(ud2);
+
+        // 本人コメント + 他人コメント（例として「さくら」を混ぜる）
+        doing_messages.push(
+            {
+                id: `m-${ud1.id}-1`,
+                user_doing_id: ud1.id,
+                author_user_id: u.id,
+                text: "この問題むずい！",
+                created_at: now - 1000 * 10,
+            },
+            {
+                id: `m-${ud1.id}-2`,
+                user_doing_id: ud1.id,
+                author_user_id: u.id,
+                text: "とけた〜",
+                created_at: now - 1000 * 6,
+            },
+            {
+                id: `m-${ud1.id}-3`,
+                user_doing_id: ud1.id,
+                author_user_id: 2, // さくらが書いた想定
+                text: "おめでとう！",
+                created_at: now - 1000 * 2,
+            },
+        );
+    });
+
+    return { user_doings, doing_messages };
 }
 
-/**
- * 画面上に浮かぶ「人（発言者）」の見た目コンポーネント
- * 動的な値（left/top/sizeなど）だけ inline に残す
- */
-function PersonBubble({ person, onClick }) {
-    const { comment, x, y, size, drift } = person;
+// =========================
+// Selectors
+// =========================
 
-    return (
-        <button
-            type="button"
-            onClick={() => onClick(person)}
-            className="person"
-            style={{
-                left: `${x}%`,
-                top: `${y}%`,
-                width: size,
-                height: size,
-                animationDelay: `${randInt(0, 800)}ms`,
-            }}
-            aria-label="person bubble"
-            title="クリックで発言を見る"
-        >
-            <span
-                className="personInner"
-                style={{
-                    fontSize: Math.floor(size * 0.42),
-                    transform: `translateX(${drift}px)`,
-                }}
-            >
-                {comment.avatar}
-            </span>
-        </button>
+/** user_doings から、そのユーザーの「最新 doing（=今）」を取る */
+function getCurrentUserDoing(userId, userDoings) {
+    let best = null;
+    for (const ud of userDoings) {
+        if (ud.user_id !== userId) continue;
+        if (!best || ud.started_at > best.started_at) best = ud;
+    }
+    return best;
+}
+
+/** そのユーザーの「今の doing_key」を取る（無ければ先頭） */
+function getCurrentDoingKey(userId, userDoings) {
+    return getCurrentUserDoing(userId, userDoings)?.doing_key ?? DOINGS[0].key;
+}
+
+export default function Top() {
+    const plazaRef = useRef(null);
+
+    // ---- mock DB state ----
+    const [dbUsers] = useState(() => USERS);
+    const [dbDoings] = useState(() => DOINGS);
+
+    const [
+        { user_doings: initialUserDoings, doing_messages: initialMessages },
+    ] = useState(() => buildInitialUserDoingsAndMessages());
+
+    const [userDoings, setUserDoings] = useState(() => initialUserDoings);
+    const [doingMessages, setDoingMessages] = useState(() => initialMessages);
+    const [avatarStates, setAvatarStates] = useState(() =>
+        buildInitialAvatarStates(USERS.map((u) => u.id)),
     );
-}
 
-/**
- * 今日の日付を JST の YYYYMMDD 形式で返す
- * @returns
- */
-function getTodayJstYmd() {
-    const now = new Date();
+    // UI state
+    const [selectedUserId, setSelectedUserId] = useState(null);
 
-    // JST = UTC +9
-    const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    // コメント入力（自分 / 他人）
+    const [myComment, setMyComment] = useState("");
+    const [otherComment, setOtherComment] = useState("");
 
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${jst.getUTCFullYear()}${pad(jst.getUTCMonth() + 1)}${pad(
-        jst.getUTCDate()
-    )}`;
-}
+    // 自分ユーザー（表示用）
+    const currentUser = useMemo(
+        () =>
+            dbUsers.find((u) => u.id === CURRENT_USER_ID) ?? {
+                id: CURRENT_USER_ID,
+                name: "me",
+            },
+        [dbUsers],
+    );
 
-export default function Top(props) {
-    // サーバーから受け取る形に寄せる（今はモックでOK）
-    const todayTheme = props?.todayTheme ?? {
-        id: 1,
-        body: "さいきん「いいな」と思った小さなこと😊",
-    };
-    const todayFormatted = props?.todayFormatted ?? "";
-
-    const currentDay = props.day;
-    const todayJst = getTodayJstYmd();
-    const isLatestDay = currentDay >= todayJst;
-
-    const mockComments = useMemo(() => {
-        const base = props?.comments?.length
-            ? props.comments
-            : makeMockComments();
-
-        return base.map((c, i) => {
-            // 1) avatar_id が来たら id→emoji に変換
-            const emojiFromId =
-                typeof c.avatar_id === "number"
-                    ? AVATARS.find((a) => a.id === c.avatar_id)?.emoji ?? "🙂"
-                    : null;
-
-            // 2) 互換：mock の c.avatar（絵文字）があればそれを優先
-            const emoji = c.avatar ?? emojiFromId ?? pickOne(AVATARS).emoji;
-
+    // timeline
+    const [timeline, setTimeline] = useState(() => {
+        const initial = dbUsers.slice(0, 6).map((u) => {
+            const currentDoingKey = getCurrentDoingKey(u.id, initialUserDoings);
             return {
-                id: c.id ?? i + 1,
-                name: c.name ?? "匿名",
-                body: c.body ?? "",
-                gender: c.gender ?? "unknown",
-                age_range: c.age_range ?? "20s",
-                avatar: emoji, // ← 常に絵文字string
+                id: `${u.id}-${Date.now()}-${Math.random()}`,
+                text: `${u.name}さんが ${doingInfo(currentDoingKey).label} をしています`,
             };
         });
-    }, [props?.comments]);
+        return initial;
+    });
 
-    // --------------------------------------------
+    // -------------------------
+    // DB join: users view
+    // -------------------------
 
-    // テーマ切替（dark / light）
-    const [theme, setTheme] = useState(() => getInitialTheme());
-    useEffect(() => {
-        document.documentElement.dataset.theme = theme;
-        try {
-            localStorage.setItem(THEME_KEY, theme);
-        } catch {}
-    }, [theme]);
-
-    // 表示中の人たち（初期：全員表示）
-    const [people, setPeople] = useState(() =>
-        mockComments.map((c) => spawnPerson(c))
-    );
-
-    // 自動一言
-    const [autoSpeak, setAutoSpeak] = useState(null);
-
-    // 同じキャラが連続で発言しないようにするための直前発言者キー
-    const lastSpeakerKeyRef = useRef(null);
-
-    // ポップアップ（人をクリック）
-    const [selected, setSelected] = useState(null);
-
-    // 投稿モーダル
-    const [postOpen, setPostOpen] = useState(false);
-    const [postName, setPostName] = useState("");
-    const [postBody, setPostBody] = useState("");
-    const [postGender, setPostGender] = useState("unknown");
-    const [postAge, setPostAge] = useState("20s");
-    const [postAvatar, setPostAvatar] = useState(AVATARS[0]);
-
-    // 自動発言制御
-    const autoSpeakTimerRef = useRef(null);
-
-    //
-    const lastKey = lastSpeakerKeyRef.current;
-
-    useEffect(() => {
-        let cancelled = false;
-
-        function clearTimer() {
-            if (autoSpeakTimerRef.current) {
-                clearTimeout(autoSpeakTimerRef.current);
-                autoSpeakTimerRef.current = null;
-            }
+    /** users + user_doings(最新) + avatar_states を合成して点表示用のビューを作る */
+    const usersView = useMemo(() => {
+        const latestByUser = new Map();
+        for (const ud of userDoings) {
+            const prev = latestByUser.get(ud.user_id);
+            if (!prev || ud.started_at > prev.started_at)
+                latestByUser.set(ud.user_id, ud);
         }
 
-        // 自動発言ループ
-        function loop() {
-            if (cancelled) return;
+        const posByUser = new Map(avatarStates.map((a) => [a.user_id, a]));
 
-            // 人がいなければ少し待って再トライ
-            if (!people.length) {
-                autoSpeakTimerRef.current = setTimeout(loop, 2000);
-                return;
-            }
+        return dbUsers.map((u) => {
+            const current = latestByUser.get(u.id);
+            const pos = posByUser.get(u.id);
+            return {
+                id: u.id,
+                name: u.name,
+                currentDoing: current?.doing_key ?? dbDoings[0].key,
+                pos: pos ? { x: pos.x, y: pos.y } : { x: 100, y: 100 },
+            };
+        });
+    }, [dbUsers, dbDoings, userDoings, avatarStates]);
 
-            // クリックでモーダル開いてる時は自動発言を控える
-            if (selected) {
-                autoSpeakTimerRef.current = setTimeout(loop, 2000);
-                return;
-            }
+    /**
+     * 選択ユーザーの詳細ビュー
+     * - その人の doing 履歴（最新順）を見出しブロックにして返す
+     * - messages は author_user_id から “self/other” を計算して整形する
+     */
+    const selectedUser = useMemo(() => {
+        if (!selectedUserId) return null;
 
-            const lastKey = lastSpeakerKeyRef.current;
-            const candidates =
-                people.length >= 2
-                    ? people.filter((x) => x.key !== lastKey)
-                    : people;
+        const user = dbUsers.find((u) => u.id === selectedUserId);
+        if (!user) return null;
 
-            // ランダムに1人選ぶ
-            const p = pickOne(candidates);
+        const currentDoingKey = getCurrentDoingKey(selectedUserId, userDoings);
 
-            lastSpeakerKeyRef.current = p.key;
+        const uds = userDoings
+            .filter((ud) => ud.user_id === selectedUserId)
+            .slice()
+            .sort((a, b) => b.started_at - a.started_at);
 
-            // 吹き出し表示（10秒）
-            setAutoSpeak({
-                key: crypto?.randomUUID?.() ?? `${Date.now()}_${Math.random()}`,
-                personKey: p.key,
-                body: p.comment.body,
+        const blocks = [];
+        const seen = new Set();
+        for (const ud of uds) {
+            if (seen.has(ud.doing_key)) continue;
+            seen.add(ud.doing_key);
+
+            const msgs = doingMessages
+                .filter((m) => m.user_doing_id === ud.id)
+                .slice()
+                .sort((a, b) => a.created_at - b.created_at)
+                .map((m) => {
+                    const side =
+                        m.author_user_id === selectedUserId ? "self" : "other";
+                    const author = dbUsers.find(
+                        (u) => u.id === m.author_user_id,
+                    );
+                    return {
+                        side,
+                        text: m.text,
+                        authorName: author?.name ?? "?",
+                        authorUserId: m.author_user_id,
+                    };
+                });
+
+            blocks.push({
+                doingKey: ud.doing_key,
+                userDoingId: ud.id,
+                startedAt: ud.started_at,
+                messages: msgs,
+            });
+            if (blocks.length >= 4) break;
+        }
+
+        return {
+            id: user.id,
+            name: user.name,
+            currentDoing: currentDoingKey,
+            logs: blocks,
+        };
+    }, [selectedUserId, dbUsers, userDoings, doingMessages]);
+
+    const isSelectedMe = selectedUser?.id === CURRENT_USER_ID;
+
+    // -------------------------
+    // interactions
+    // -------------------------
+
+    /** 点クリックでユーザー選択（詳細パネルを開く） */
+    const onClickDot = (id) => {
+        setSelectedUserId(id);
+    };
+
+    /** メニューからユーザー選択 */
+    const onPickUserFromMenu = (id) => setSelectedUserId(id);
+
+    /** Myボタン：いつでも自分の詳細を開く */
+    const openMyPanel = () => {
+        setSelectedUserId(CURRENT_USER_ID);
+    };
+
+    /**
+     * 自分の doing 切り替え（user_doingsにINSERT）
+     * - 履歴として追加するだけ（更新ではなくINSERT）
+     */
+    const setMyDoing = (doingKey) => {
+        setUserDoings((prev) => {
+            const now = Date.now();
+            const currentKey = getCurrentDoingKey(CURRENT_USER_ID, prev);
+            if (currentKey === doingKey) return prev;
+
+            const newUserDoing = {
+                id: `ud-${CURRENT_USER_ID}-${now}-${Math.random().toString(16).slice(2)}`,
+                user_id: CURRENT_USER_ID,
+                doing_key: doingKey,
+                started_at: now,
+            };
+
+            // timeline
+            setTimeline((tl) => {
+                const text = `${currentUser.name}さんが ${doingInfo(doingKey).label} をしています`;
+                const item = {
+                    id: `${CURRENT_USER_ID}-${now}-${Math.random()}`,
+                    text,
+                };
+                return [...tl, item].slice(-20);
             });
 
-            // 10秒表示 → 消す → 少し間を置いて次
-            autoSpeakTimerRef.current = setTimeout(() => {
-                setAutoSpeak(null);
+            return [newUserDoing, ...prev].slice(0, 300);
+        });
+    };
 
-                autoSpeakTimerRef.current = setTimeout(() => {
-                    loop();
-                }, randInt(2000, 4000));
-            }, 10000);
+    /**
+     * 自分の最新 doing にコメント投稿（doing_messagesにINSERT）
+     * - author_user_id で「誰の投稿か」を保持
+     */
+    const submitMyComment = () => {
+        const text = myComment.trim();
+        if (!text) return;
+
+        const now = Date.now();
+        const currentUd = getCurrentUserDoing(CURRENT_USER_ID, userDoings);
+        if (!currentUd) return;
+
+        setDoingMessages((prev) => [
+            ...prev,
+            {
+                id: `m-${currentUd.id}-${now}-${Math.random().toString(16).slice(2)}`,
+                user_doing_id: currentUd.id,
+                author_user_id: CURRENT_USER_ID,
+                text,
+                created_at: now,
+            },
+        ]);
+
+        setMyComment("");
+    };
+
+    /**
+     * 他人の「doing」にコメント投稿
+     * - selectedUserId の最新 user_doing に紐付けて INSERT
+     */
+    const submitCommentToSelected = () => {
+        if (!selectedUserId) return;
+        if (selectedUserId === CURRENT_USER_ID) return;
+
+        const text = otherComment.trim();
+        if (!text) return;
+
+        const now = Date.now();
+        const targetUd = getCurrentUserDoing(selectedUserId, userDoings);
+        if (!targetUd) return;
+
+        setDoingMessages((prev) => [
+            ...prev,
+            {
+                id: `m-${targetUd.id}-${now}-${Math.random().toString(16).slice(2)}`,
+                user_doing_id: targetUd.id,
+                author_user_id: CURRENT_USER_ID,
+                text,
+                created_at: now,
+            },
+        ]);
+
+        setOtherComment("");
+    };
+
+    /** Enterで送信（自分） */
+    const onMyCommentKeyDown = (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            submitMyComment();
         }
+    };
 
-        clearTimer();
-        loop();
+    /** Enterで送信（他人） */
+    const onOtherCommentKeyDown = (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            submitCommentToSelected();
+        }
+    };
 
-        return () => {
-            cancelled = true;
-            clearTimer();
-        };
-    }, [people, selected]);
-
-    // 「ふわっと出たり消えたり」制御
-    const tickRef = useRef(null);
+    // -------------------------
+    // "賑やかさ"：他人だけ 2.5秒ごとに doing 更新（自分は触らない）
+    // -------------------------
     useEffect(() => {
-        tickRef.current = window.setInterval(() => {
-            setPeople((prev) => {
+        const t = setInterval(() => {
+            setUserDoings((prev) => {
+                const others = dbUsers.filter((u) => u.id !== CURRENT_USER_ID);
+                const who = pick(others);
                 const now = Date.now();
 
-                return prev.map((p) => {
-                    if (now < p.nextMoveAt) return p;
+                const currentKey = getCurrentDoingKey(who.id, prev);
+                const newDoing = pick(dbDoings).key;
+                if (newDoing === currentKey) return prev;
 
-                    const dx = randInt(-3, 3);
-                    const dy = randInt(-3, 3);
+                const newUserDoing = {
+                    id: `ud-${who.id}-${now}-${Math.random().toString(16).slice(2)}`,
+                    user_id: who.id,
+                    doing_key: newDoing,
+                    started_at: now,
+                };
 
+                // その人本人の一言を自動で付ける（author_user_id = 本人）
+                setDoingMessages((msgs) => [
+                    ...msgs,
+                    {
+                        id: `m-${newUserDoing.id}-1`,
+                        user_doing_id: newUserDoing.id,
+                        author_user_id: who.id,
+                        text: "はじめよ〜",
+                        created_at: now + 1,
+                    },
+                ]);
+
+                setTimeline((tl) => {
+                    const text = `${who.name}さんが ${doingInfo(newDoing).label} をしています`;
+                    const item = {
+                        id: `${who.id}-${now}-${Math.random()}`,
+                        text,
+                    };
+                    return [...tl, item].slice(-20);
+                });
+
+                return [newUserDoing, ...prev].slice(0, 300);
+            });
+        }, 2500);
+
+        return () => clearInterval(t);
+    }, [dbUsers, dbDoings]);
+
+    // -------------------------
+    // 漂い（avatar_states更新）
+    // -------------------------
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setAvatarStates((prev) => {
+                const el = plazaRef.current;
+                if (!el) return prev;
+
+                const rect = el.getBoundingClientRect();
+                const minX = 28;
+                const minY = 28;
+                const maxX = Math.max(minX + 1, rect.width - 28);
+                const maxY = Math.max(minY + 1, rect.height - 28);
+
+                return prev.map((a) => {
+                    const bias = a.user_id === selectedUserId ? 0.25 : 1.0;
+                    const dx = (Math.random() - 0.5) * 18 * bias;
+                    const dy = (Math.random() - 0.5) * 18 * bias;
                     return {
-                        ...p,
-                        x: clamp(p.x + dx, 10, 90),
-                        y: clamp(p.y + dy, 25, 88),
-                        nextMoveAt: now + randInt(1000, 5000),
+                        ...a,
+                        x: clamp(a.x + dx, minX, maxX),
+                        y: clamp(a.y + dy, minY, maxY),
                     };
                 });
             });
-        }, randInt(3200, 5200));
+        }, 1000);
 
-        return () => {
-            if (tickRef.current) window.clearInterval(tickRef.current);
-        };
-    }, [mockComments]);
-
-    function openPerson(person) {
-        setSelected(person);
-    }
-
-    function closePerson() {
-        setSelected(null);
-    }
-
-    function submitPost(e) {
-        e.preventDefault();
-
-        const bodyRaw = postBody; // 改行含めてそのまま
-        const bodyForCheck = postBody.trim(); // 空チェック用
-
-        if (!bodyForCheck) return;
-
-        const payload = {
-            day: currentDay,
-            name: postName.trim() || "匿名",
-            body: bodyRaw, // ← trimしない！
-            gender: postGender,
-            age_range: postAge,
-            avatar_id: postAvatar?.id ?? null,
-        };
-
-        router.post("/comments", payload, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setPostName("");
-                setPostBody("");
-                setPostGender("unknown");
-                setPostAge("20s");
-                setPostAvatar(AVATARS[0]);
-                setPostOpen(false);
-            },
-        });
-    }
-
-    //   function submitPost(e) {
-    //     e.preventDefault();
-
-    //     const newComment = {
-    //       id: Date.now(),
-    // 	  name: postName.trim() || "匿名",
-    //       body: postBody.trim(),
-    //       gender: postGender,
-    //       age: postAge,
-    //       avatar: postAvatar,
-    //     };
-
-    //     if (!newComment.body) return;
-
-    //     setPeople((prev) => {
-    //       const max = 3;
-    //       const next = [spawnPerson(newComment), ...prev];
-    //       return next.slice(0, max);
-    //     });
-
-    // 	setPostName("");
-    //     setPostBody("");
-    //     setPostGender("unknown");
-    //     setPostAge("20s");
-    //     setPostAvatar(AVATARS[0]);
-    //     setPostOpen(false);
-    //   }
+        return () => clearInterval(interval);
+    }, [selectedUserId]);
 
     return (
-        <>
-            <Head title="雑談" />
-
-            <div className="page">
-                <div className="container">
-                    {/* Header */}
-                    <div className="headerRow">
-                        <div className="brand">
-                            <div className="brandTitle">zatsudan</div>
-                            <div className="brandSub">日々の作業のお供に</div>
-                        </div>
-
-                        <div className="actions">
-                            <button
-                                type="button"
-                                className="btn btnSm"
-                                onClick={() =>
-                                    setTheme((t) =>
-                                        t === "dark" ? "light" : "dark"
-                                    )
-                                }
-                                aria-label="toggle theme"
-                                title="テーマ切替"
-                            >
-                                {theme === "dark" ? "☀️ Light" : "🌙 Dark"}
-                            </button>
-
-                            <button
-                                type="button"
-                                className="btn"
-                                onClick={() => setPostOpen(true)}
-                            >
-                                投稿する
-                            </button>
-                        </div>
-                    </div>
-
-                    {props.flash?.error && (
-                        <div
-                            style={{
-                                marginTop: 12,
-                                padding: 12,
-                                borderRadius: 12,
-                                border: "1px solid rgba(255,80,80,0.35)",
-                                background: "rgba(255,80,80,0.12)",
-                                color: "rgba(255,255,255,0.92)",
-                                fontSize: 13,
-                            }}
-                        >
-                            {props.flash.error}
-                        </div>
-                    )}
-
-                    {/* 今日のお題 */}
-                    <div className="card">
-                        <div className="cardMeta">{todayFormatted}</div>
-                        <div className="cardTitle">
-                            今日のお題：{todayTheme.body}
-                        </div>
-                        <div
-                            style={{ display: "flex", gap: 10, marginTop: 12 }}
-                        >
-                            <button
-                                className="btn btnSm"
-                                onClick={() => {
-                                    router.get("/", {
-                                        day: shiftDay(currentDay, -1),
-                                    });
-                                }}
-                            >
-                                ← 前の日
-                            </button>
-
-                            <button
-                                disabled={isLatestDay}
-                                className="btn btnSm"
-                                onClick={() => {
-                                    if (!isLatestDay) {
-                                        router.get("/", {
-                                            day: shiftDay(currentDay, 1),
-                                        });
-                                    }
-                                }}
-                                style={{
-                                    opacity: isLatestDay ? 0.4 : 1,
-                                    cursor: isLatestDay
-                                        ? "not-allowed"
-                                        : "pointer",
-                                }}
-                            >
-                                次の日 →
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* メイン表示領域（人が浮かぶ） */}
-                    <div className="stage">
-                        <div className="stageGrain" />
-
-                        {/* 人たち */}
-                        {people.map((p) => (
-                            <PersonBubble
-                                key={p.key}
-                                person={p}
-                                onClick={openPerson}
-                            />
-                        ))}
-
-                        {/* 自動発言の吹き出し */}
-                        {autoSpeak &&
-                            (() => {
-                                const p = people.find(
-                                    (x) => x.key === autoSpeak.personKey
-                                );
-                                if (!p) return null;
-
-                                return (
-                                    <div
-                                        key={autoSpeak.key}
-                                        className="speech"
-                                        style={{
-                                            left: `${p.x}%`,
-                                            top: `${p.y}%`,
-                                            whiteSpace: "pre-wrap",
-                                        }}
-                                    >
-                                        {autoSpeak.body}
-                                    </div>
-                                );
-                            })()}
+        <div style={styles.page}>
+            {/* Top bar */}
+            <div style={styles.topbar}>
+                <div style={styles.brand}>
+                    <div style={styles.brandTitle}>zatsudan</div>
+                    <div style={styles.brandSub}>
+                        いるだけ広場（MVP / 自分操作あり）
                     </div>
                 </div>
 
-                {/* 発言ポップアップ */}
-                <ModalBase
-                    open={!!selected}
-                    onClose={closePerson}
-                    title="ひとこと"
-                >
-                    {selected && (
-                        <div style={{ display: "grid", gap: 12 }}>
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 10,
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        width: 44,
-                                        height: 44,
-                                        borderRadius: 999,
-                                        display: "grid",
-                                        placeItems: "center",
-                                        background: "rgba(255,255,255,0.08)",
-                                        border: "1px solid rgba(255,255,255,0.12)",
-                                        fontSize: 22,
-                                    }}
-                                >
-                                    {selected.comment.avatar}
-                                </div>
-                                <div style={{ display: "grid" }}>
-                                    <div style={{ fontWeight: 800 }}>
-                                        {GENDERS.find(
-                                            (g) =>
-                                                g.value ===
-                                                selected.comment.gender
-                                        )?.label ?? "未選択"}
-                                        {" / "}
-                                        {AGES.find(
-                                            (a) =>
-                                                a.value ===
-                                                selected.comment.age_range
-                                        )?.label ?? "年代不明"}
-                                    </div>
-                                    <div style={{ fontSize: 12, opacity: 0.6 }}>
-                                        {selected.comment.name
-                                            ? `（${selected.comment.name}）`
-                                            : "（匿名）"}
-                                    </div>{" "}
-                                </div>
-                            </div>
-
-                            <div
-                                style={{
-                                    padding: 12,
-                                    borderRadius: 14,
-                                    background: "rgba(255,255,255,0.06)",
-                                    border: "1px solid rgba(255,255,255,0.10)",
-                                    lineHeight: 1.6,
-                                    whiteSpace: "pre-wrap",
-                                    wordBreak: "break-word",
-                                }}
-                            >
-                                {selected.comment.body}
-                            </div>
-                        </div>
-                    )}
-                </ModalBase>
-
-                {/* 投稿モーダル */}
-                <ModalBase
-                    open={postOpen}
-                    onClose={() => setPostOpen(false)}
-                    title="投稿する"
-                >
-                    <div style={{ fontSize: 13, opacity: 0.75 }}>
-                        今日のお題：
-                        <span style={{ fontWeight: "bold" }}>
-                            {todayTheme.body}
-                        </span>
-                    </div>
-                    <form
-                        onSubmit={submitPost}
-                        style={{ display: "grid", gap: 12, marginTop: 6 }}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <button
+                        style={styles.myBtn}
+                        onClick={openMyPanel}
+                        title="自分を開く"
                     >
-                        <div style={{ display: "grid", gap: 6 }}>
-                            <div style={{ fontSize: 13, opacity: 0.75 }}>
-                                ひとこと
-                            </div>
-                            <textarea
-                                value={postBody}
-                                onChange={(e) => setPostBody(e.target.value)}
-                                rows={4}
-                                placeholder="話題にコメントする"
+                        My
+                    </button>
+                </div>
+            </div>
+
+            {/* Main */}
+            <div style={styles.main}>
+                {/* Plaza */}
+                <div ref={plazaRef} style={styles.plaza}>
+                    <div style={styles.bgLayer} />
+
+                    {/* dots */}
+                    {usersView.map((u) => {
+                        const d = doingInfo(u.currentDoing);
+                        const isSelected = u.id === selectedUserId;
+
+                        return (
+                            <button
+                                key={u.id}
+                                onClick={() => onClickDot(u.id)}
+                                title={`${u.name} / ${d.label}`}
                                 style={{
-                                    width: "100%",
-                                    borderRadius: 14,
-                                    padding: 12,
-                                    background: "rgba(255,255,255,0.06)",
-                                    border: "1px solid rgba(255,255,255,0.12)",
-                                    color: "rgba(255,255,255,0.92)",
-                                    outline: "none",
-                                    resize: "vertical",
-                                }}
-                            />
-                            <div style={{ fontSize: 12, opacity: 0.55 }}>
-                                ※ あとでDB保存に切り替えられるよ（今はUIだけ）
-                            </div>
-                        </div>
-
-                        {/* 名前 */}
-                        <div style={{ display: "grid", gap: 6 }}>
-                            <div style={{ fontSize: 13, opacity: 0.75 }}>
-                                名前
-                            </div>
-                            <input
-                                type="text"
-                                value={postName}
-                                onChange={(e) => setPostName(e.target.value)}
-                                placeholder="匿名でもOK"
-                                style={{
-                                    width: "100%",
-                                    borderRadius: 14,
-                                    padding: "10px 12px",
-                                    background: "rgba(255,255,255,0.06)",
-                                    border: "1px solid rgba(255,255,255,0.12)",
-                                    color: "rgba(255,255,255,0.92)",
-                                    outline: "none",
-                                }}
-                            />
-                        </div>
-
-                        <div
-                            style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr",
-                                gap: 12,
-                            }}
-                        >
-                            <div style={{ display: "grid", gap: 6 }}>
-                                <div style={{ fontSize: 13, opacity: 0.75 }}>
-                                    性別
-                                </div>
-                                <select
-                                    value={postGender}
-                                    onChange={(e) =>
-                                        setPostGender(e.target.value)
-                                    }
-                                    style={{
-                                        width: "100%",
-                                        borderRadius: 14,
-                                        padding: "10px 12px",
-                                        background: "rgba(255,255,255,0.06)",
-                                        border: "1px solid rgba(255,255,255,0.12)",
-                                        color: "rgba(255,255,255,0.92)",
-                                        outline: "none",
-                                    }}
-                                >
-                                    {GENDERS.map((g) => (
-                                        <option
-                                            key={g.value}
-                                            value={g.value}
-                                            style={{ color: "#111" }}
-                                        >
-                                            {g.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div style={{ display: "grid", gap: 6 }}>
-                                <div style={{ fontSize: 13, opacity: 0.75 }}>
-                                    年代
-                                </div>
-                                <select
-                                    value={postAge}
-                                    onChange={(e) => setPostAge(e.target.value)}
-                                    style={{
-                                        width: "100%",
-                                        borderRadius: 14,
-                                        padding: "10px 12px",
-                                        background: "rgba(255,255,255,0.06)",
-                                        border: "1px solid rgba(255,255,255,0.12)",
-                                        color: "rgba(255,255,255,0.92)",
-                                        outline: "none",
-                                    }}
-                                >
-                                    {AGES.map((a) => (
-                                        <option
-                                            key={a.value}
-                                            value={a.value}
-                                            style={{ color: "#111" }}
-                                        >
-                                            {a.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style={{ display: "grid", gap: 8 }}>
-                            <div style={{ fontSize: 13, opacity: 0.75 }}>
-                                アバター（6択）
-                            </div>
-                            <div
-                                style={{
-                                    display: "flex",
-                                    gap: 10,
-                                    flexWrap: "wrap",
+                                    ...styles.dot,
+                                    left: u.pos.x,
+                                    top: u.pos.y,
+                                    transform: isSelected
+                                        ? "scale(1.4)"
+                                        : "scale(1)",
+                                    borderColor: isSelected
+                                        ? "rgba(0,0,0,0.3)"
+                                        : "rgba(0,0,0,0.15)",
+                                    boxShadow: isSelected
+                                        ? `0 0 0 6px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.15)`
+                                        : "0 2px 8px rgba(0,0,0,0.1)",
                                 }}
                             >
-                                {AVATARS.map((a) => {
-                                    const active = postAvatar === a;
-                                    return (
+                                <span
+                                    style={{
+                                        ...styles.dotCore,
+                                        // background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9), ${d.color} 55%, rgba(0,0,0,0.15) 120%)`,
+                                        backgroundImage:
+                                            'url("/images/avatar/test.png")',
+                                        backgroundSize: "cover",
+                                        backgroundPosition: "center",
+                                        backgroundRepeat: "no-repeat",
+                                    }}
+                                />
+                                <span style={styles.dotLabel}>
+                                    {d.emoji} {u.name}
+                                </span>
+                            </button>
+                        );
+                    })}
+
+                    {/* Selected user panel */}
+                    {selectedUser && (
+                        <div style={styles.detailPanel}>
+                            <div style={styles.detailHeader}>
+                                <div style={styles.detailName}>
+                                    {selectedUser.name}
+                                    <span style={styles.detailNow}>
+                                        今：
+                                        {
+                                            doingInfo(selectedUser.currentDoing)
+                                                .emoji
+                                        }{" "}
+                                        {
+                                            doingInfo(selectedUser.currentDoing)
+                                                .label
+                                        }
+                                    </span>
+                                    {isSelectedMe && (
+                                        <span style={styles.meTag}>自分</span>
+                                    )}
+                                </div>
+                                <button
+                                    style={styles.closeBtn}
+                                    onClick={() => setSelectedUserId(null)}
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            {/* 自分操作: doing切り替え + 自分コメント */}
+                            {isSelectedMe && (
+                                <div style={styles.myControls}>
+                                    <div
+                                        style={{
+                                            fontWeight: 900,
+                                            fontSize: 12,
+                                            opacity: 0.85,
+                                        }}
+                                    >
+                                        Doing切り替え
+                                    </div>
+
+                                    <div style={styles.myDoingGrid}>
+                                        {dbDoings.map((d) => {
+                                            const active =
+                                                d.key ===
+                                                selectedUser.currentDoing;
+                                            return (
+                                                <button
+                                                    key={d.key}
+                                                    onClick={() =>
+                                                        setMyDoing(d.key)
+                                                    }
+                                                    style={{
+                                                        ...styles.doingChip,
+                                                        borderColor: active
+                                                            ? "rgba(0,0,0,0.22)"
+                                                            : "rgba(0,0,0,0.10)",
+                                                        background: active
+                                                            ? "rgba(0,0,0,0.04)"
+                                                            : "#FFFFFF",
+                                                    }}
+                                                    title={d.label}
+                                                >
+                                                    <span
+                                                        style={{
+                                                            marginRight: 8,
+                                                        }}
+                                                    >
+                                                        {d.emoji}
+                                                    </span>
+                                                    <span
+                                                        style={{
+                                                            fontWeight: 900,
+                                                        }}
+                                                    >
+                                                        {d.label}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div style={styles.myCommentRow}>
+                                        <textarea
+                                            value={myComment}
+                                            onChange={(e) =>
+                                                setMyComment(e.target.value)
+                                            }
+                                            onKeyDown={onMyCommentKeyDown}
+                                            placeholder="いまのdoingにコメント（Enterで送信 / Shift+Enterで改行）"
+                                            style={styles.myTextarea}
+                                            rows={2}
+                                        />
                                         <button
-                                            key={a}
-                                            type="button"
-                                            onClick={() => setPostAvatar(a)}
-                                            style={{
-                                                width: 44,
-                                                height: 44,
-                                                borderRadius: 999,
-                                                border: active
-                                                    ? "1px solid rgba(255,255,255,0.65)"
-                                                    : "1px solid rgba(255,255,255,0.18)",
-                                                background: active
-                                                    ? "rgba(255,255,255,0.14)"
-                                                    : "rgba(255,255,255,0.06)",
-                                                cursor: "pointer",
-                                                fontSize: 22,
-                                                boxShadow: active
-                                                    ? "0 10px 30px rgba(0,0,0,0.5)"
-                                                    : "none",
-                                            }}
-                                            aria-label={`avatar ${a}`}
+                                            style={styles.sendBtn}
+                                            onClick={submitMyComment}
                                         >
-                                            {a.emoji}
+                                            送信
                                         </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 他人操作: その人の「今のdoing」にコメント */}
+                            {!isSelectedMe && (
+                                <div style={styles.myControls}>
+                                    <div
+                                        style={{
+                                            fontWeight: 900,
+                                            fontSize: 12,
+                                            opacity: 0.85,
+                                        }}
+                                    >
+                                        {(() => {
+                                            const di = doingInfo(
+                                                selectedUser.currentDoing,
+                                            );
+                                            return (
+                                                <>
+                                                    {selectedUser.name}さんの「
+                                                    {di.emoji} {di.label}
+                                                    」にコメント
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+
+                                    <div style={styles.myCommentRow}>
+                                        <textarea
+                                            value={otherComment}
+                                            onChange={(e) =>
+                                                setOtherComment(e.target.value)
+                                            }
+                                            onKeyDown={onOtherCommentKeyDown}
+                                            placeholder="Enterで送信 / Shift+Enterで改行"
+                                            style={styles.myTextarea}
+                                            rows={2}
+                                        />
+                                        <button
+                                            style={styles.sendBtn}
+                                            onClick={submitCommentToSelected}
+                                        >
+                                            送信
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* logs with headings */}
+                            <div style={styles.logs}>
+                                {selectedUser.logs.map((log) => {
+                                    const di = doingInfo(log.doingKey);
+                                    return (
+                                        <div
+                                            key={log.doingKey}
+                                            style={styles.logBlock}
+                                        >
+                                            <div style={styles.logHeading}>
+                                                <span
+                                                    style={{ marginRight: 8 }}
+                                                >
+                                                    {di.emoji}
+                                                </span>
+                                                <span
+                                                    style={{ fontWeight: 800 }}
+                                                >
+                                                    {di.label}
+                                                </span>
+                                                <span style={styles.logTime}>
+                                                    {formatDoingStartTime(
+                                                        log.startedAt,
+                                                    )}
+                                                </span>
+                                            </div>
+
+                                            <div style={styles.msgList}>
+                                                {log.messages.length === 0 ? (
+                                                    <div style={styles.msgHint}>
+                                                        （まだコメントなし）
+                                                    </div>
+                                                ) : (
+                                                    log.messages.map(
+                                                        (m, idx) => (
+                                                            <div
+                                                                key={idx}
+                                                                style={{
+                                                                    ...styles.msgRow,
+                                                                    justifyContent:
+                                                                        m.side ===
+                                                                        "other"
+                                                                            ? "flex-end"
+                                                                            : "flex-start",
+                                                                }}
+                                                            >
+                                                                <div
+                                                                    style={{
+                                                                        ...styles.msgBubble,
+                                                                        background:
+                                                                            m.side ===
+                                                                            "other"
+                                                                                ? "#4A90E2"
+                                                                                : "#F0F0F0",
+                                                                        borderColor:
+                                                                            m.side ===
+                                                                            "other"
+                                                                                ? "#4A90E2"
+                                                                                : "rgba(0,0,0,0.10)",
+                                                                        color:
+                                                                            m.side ===
+                                                                            "other"
+                                                                                ? "#FFFFFF"
+                                                                                : "#333",
+                                                                    }}
+                                                                >
+                                                                    {m.text}
+                                                                    {m.side ===
+                                                                        "other" && (
+                                                                        <button
+                                                                            style={
+                                                                                styles.otherTag
+                                                                            }
+                                                                            onClick={() => {
+                                                                                setSelectedUserId(
+                                                                                    m.authorUserId,
+                                                                                );
+                                                                            }}
+                                                                            title={`${m.authorName}さんを見る`}
+                                                                        >
+                                                                            {
+                                                                                m.authorName
+                                                                            }
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ),
+                                                    )
+                                                )}
+                                            </div>
+                                        </div>
                                     );
                                 })}
                             </div>
                         </div>
+                    )}
+                </div>
 
-                        <div
-                            style={{
-                                display: "flex",
-                                gap: 10,
-                                justifyContent: "flex-end",
-                                marginTop: 6,
-                            }}
-                        >
-                            <button
-                                type="button"
-                                onClick={() => setPostOpen(false)}
-                                style={{
-                                    border: "1px solid rgba(255,255,255,0.18)",
-                                    background: "rgba(255,255,255,0.06)",
-                                    color: "rgba(255,255,255,0.95)",
-                                    borderRadius: 12,
-                                    padding: "10px 12px",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                キャンセル
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={!postBody.trim()}
-                                style={{
-                                    border: "1px solid rgba(255,255,255,0.20)",
-                                    background: postBody.trim()
-                                        ? "rgba(255,255,255,0.12)"
-                                        : "rgba(255,255,255,0.06)",
-                                    color: "rgba(255,255,255,0.95)",
-                                    borderRadius: 12,
-                                    padding: "10px 14px",
-                                    cursor: postBody.trim()
-                                        ? "pointer"
-                                        : "not-allowed",
-                                }}
-                            >
-                                送信
-                            </button>
-                        </div>
-                    </form>
-                </ModalBase>
+                {/* Right drawer */}
+                <div style={styles.drawer}>
+                    <div style={styles.drawerHeader}>みんなたち</div>
+
+                    <div style={styles.drawerList}>
+                        {usersView.map((u) => {
+                            const d = doingInfo(u.currentDoing);
+                            const isSelected = u.id === selectedUserId;
+
+                            return (
+                                <button
+                                    key={u.id}
+                                    onClick={() => onPickUserFromMenu(u.id)}
+                                    style={{
+                                        ...styles.userRow,
+                                        background: isSelected
+                                            ? "rgba(255,255,255,0.14)"
+                                            : "transparent",
+                                    }}
+                                >
+                                    <span
+                                        style={{
+                                            ...styles.userDot,
+                                            background: d.color,
+                                        }}
+                                    />
+                                    <span style={styles.userName}>
+                                        {u.name}
+                                    </span>
+                                    <span style={styles.userDoing}>
+                                        {d.emoji} {d.label}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
             </div>
-        </>
+
+            {/* Bottom timeline */}
+            <div style={styles.timeline}>
+                <div style={styles.timelineLabel}>Timeline</div>
+
+                <div style={styles.marqueeWrap}>
+                    <div style={styles.marqueeInner}>
+                        {[...timeline, ...timeline].map((t, i) => (
+                            <span
+                                key={`${t.id}-${i}`}
+                                style={styles.timelineItem}
+                            >
+                                {t.text}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }

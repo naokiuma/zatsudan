@@ -1,0 +1,153 @@
+/* サイドバー本体 */
+.zsSidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 360px;
+    height: 100vh;
+    background: rgba(20, 20, 20, 0.86);
+    backdrop-filter: blur(12px);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    z-index: 30;
+    transform: translateX(0);
+    transition: transform 0.22s ease;
+}
+
+.zsSidebar.isClosed {
+    transform: translateX(calc(100% + 8px));
+}
+
+/* 取っ手ボタン（常に見える） */
+.zsDock {
+    position: fixed;
+    top: 50%;
+    right: 360px; /* open時はサイドバー左端に付く */
+    transform: translateY(-50%);
+    width: 28px;
+    height: 56px;
+    border-radius: 14px 0 0 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.9);
+    z-index: 31;
+    transition:
+        right 0.22s ease,
+        opacity 0.22s ease;
+    cursor: pointer;
+}
+
+/* 閉じた時は右端に貼り付く */
+.zsSidebar.isClosed + .zsDock {
+    /* ←これは効かないので後で補足する */
+}
+
+.zsDock.isOpen {
+    right: 360px;
+}
+.zsDock.isClosed {
+    right: 0;
+}
+
+/* header */
+.zsHeader {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.zsTitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+}
+.zsHeaderBtn {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* body */
+.zsBody {
+    overflow-y: auto;
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+}
+.zsEmpty {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 12px;
+    padding: 8px;
+}
+.zsComment {
+    padding: 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.zsCommentName {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 4px;
+}
+.zsCommentBody {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.45;
+}
+
+/* footer */
+.zsFooter {
+    padding: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    gap: 8px;
+}
+.zsInput {
+    flex: 1;
+    height: 34px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.9);
+    padding: 0 10px;
+}
+.zsSend {
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* mobile: 下からのシートに */
+@media (max-width: 900px) {
+    .zsSidebar {
+        width: 100vw;
+        height: 42vh;
+        bottom: 0;
+        top: auto;
+        right: 0;
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        transform: translateY(0);
+    }
+    .zsSidebar.isClosed {
+        transform: translateY(calc(100% + 8px));
+    }
+    .zsDock {
+        right: 0;
+        top: auto;
+        bottom: calc(42vh - 28px);
+        transform: none;
+        border-radius: 14px 14px 0 0;
+        width: 56px;
+        height: 28px;
+    }
+}
