@@ -308,7 +308,7 @@ export const styles = {
         flexDirection: "column",
         gap: 6,
         overflow: "auto",
-        height: "calc(100% - 54px)",
+        height: "100%",
     },
     userRow: {
         display: "flex",
@@ -383,4 +383,24 @@ export const styles = {
         animation: "marquee 24s linear infinite",
     },
     timelineItem: { fontSize: 13, opacity: 0.75, color: "#333" },
+
+    drawerHeaderRow: {
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
+    },
+    drawerBody: {
+        height: "calc(100% - 54px)", // header分を引く
+        position: "relative",
+        overflow: "hidden",
+    },
+
+    drawerDetailOverlay: {
+        position: "absolute",
+        inset: 0,
+        padding: 10,
+        overflow: "auto",
+    },
 };
