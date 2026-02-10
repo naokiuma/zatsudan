@@ -602,290 +602,296 @@ export default function Top() {
                             </button>
                         );
                     })}
+                </div>
 
-                    {/* Selected user panel */}
-                    {selectedUser && (
-                        <div style={styles.detailPanel}>
-                            <div style={styles.detailHeader}>
-                                <div style={styles.detailName}>
+                {/* Right drawer (右サイド：ここに統一) */}
+                <div style={styles.drawer}>
+                    {/* ヘッダー */}
+                    <div style={styles.drawerHeader}>
+                        {selectedUser ? (
+                            <div style={styles.drawerHeaderRow}>
+                                <div style={{ fontWeight: 900 }}>
                                     {selectedUser.name}
-                                    <span style={styles.detailNow}>
-                                        今：
-                                        {
-                                            doingInfo(selectedUser.currentDoing)
-                                                .emoji
-                                        }{" "}
-                                        {
-                                            doingInfo(selectedUser.currentDoing)
-                                                .label
-                                        }
-                                    </span>
-                                    {isSelectedMe && (
-                                        <span style={styles.meTag}>自分</span>
-                                    )}
                                 </div>
                                 <button
                                     style={styles.closeBtn}
                                     onClick={() => setSelectedUserId(null)}
+                                    title="閉じる"
                                 >
                                     ×
                                 </button>
                             </div>
+                        ) : (
+                            <div style={{ fontWeight: 900 }}>みんなたち</div>
+                        )}
+                    </div>
 
-                            {/* 自分操作: doing切り替え + 自分コメント */}
-                            {isSelectedMe && (
-                                <div style={styles.myControls}>
-                                    <div
-                                        style={{
-                                            fontWeight: 900,
-                                            fontSize: 12,
-                                            opacity: 0.85,
-                                        }}
-                                    >
-                                        Doing切り替え
+                    {/* 中身 */}
+                    <div style={styles.drawerBody}>
+                        {selectedUser ? (
+                            <div style={styles.drawerDetailOverlay}>
+                                {/* 自分操作 */}
+                                {isSelectedMe && (
+                                    <div style={styles.myControls}>
+                                        <div
+                                            style={{
+                                                fontWeight: 900,
+                                                fontSize: 12,
+                                                opacity: 0.85,
+                                            }}
+                                        >
+                                            Doing切り替え
+                                        </div>
+
+                                        <div style={styles.myDoingGrid}>
+                                            {dbDoings.map((d) => {
+                                                const active =
+                                                    d.key ===
+                                                    selectedUser.currentDoing;
+                                                return (
+                                                    <button
+                                                        key={d.key}
+                                                        onClick={() =>
+                                                            setMyDoing(d.key)
+                                                        }
+                                                        style={{
+                                                            ...styles.doingChip,
+                                                            borderColor: active
+                                                                ? "rgba(0,0,0,0.22)"
+                                                                : "rgba(0,0,0,0.10)",
+                                                            background: active
+                                                                ? "rgba(0,0,0,0.04)"
+                                                                : "#FFFFFF",
+                                                        }}
+                                                        title={d.label}
+                                                    >
+                                                        <span
+                                                            style={{
+                                                                marginRight: 8,
+                                                            }}
+                                                        >
+                                                            {d.emoji}
+                                                        </span>
+                                                        <span
+                                                            style={{
+                                                                fontWeight: 900,
+                                                            }}
+                                                        >
+                                                            {d.label}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div style={styles.myCommentRow}>
+                                            <textarea
+                                                value={myComment}
+                                                onChange={(e) =>
+                                                    setMyComment(e.target.value)
+                                                }
+                                                onKeyDown={onMyCommentKeyDown}
+                                                placeholder="いまのdoingにコメント（Enterで送信 / Shift+Enterで改行）"
+                                                style={styles.myTextarea}
+                                                rows={2}
+                                            />
+                                            <button
+                                                style={styles.sendBtn}
+                                                onClick={submitMyComment}
+                                            >
+                                                送信
+                                            </button>
+                                        </div>
                                     </div>
+                                )}
 
-                                    <div style={styles.myDoingGrid}>
-                                        {dbDoings.map((d) => {
-                                            const active =
-                                                d.key ===
-                                                selectedUser.currentDoing;
-                                            return (
-                                                <button
-                                                    key={d.key}
-                                                    onClick={() =>
-                                                        setMyDoing(d.key)
-                                                    }
-                                                    style={{
-                                                        ...styles.doingChip,
-                                                        borderColor: active
-                                                            ? "rgba(0,0,0,0.22)"
-                                                            : "rgba(0,0,0,0.10)",
-                                                        background: active
-                                                            ? "rgba(0,0,0,0.04)"
-                                                            : "#FFFFFF",
-                                                    }}
-                                                    title={d.label}
-                                                >
+                                {/* 他人にコメント */}
+                                {!isSelectedMe && (
+                                    <div style={styles.myControls}>
+                                        <div
+                                            style={{
+                                                fontWeight: 900,
+                                                fontSize: 12,
+                                                opacity: 0.85,
+                                            }}
+                                        >
+                                            {(() => {
+                                                const di = doingInfo(
+                                                    selectedUser.currentDoing,
+                                                );
+                                                return (
+                                                    <>
+                                                        {selectedUser.name}
+                                                        さんの「{di.emoji}{" "}
+                                                        {di.label}」にコメント
+                                                    </>
+                                                );
+                                            })()}
+                                        </div>
+
+                                        <div style={styles.myCommentRow}>
+                                            <textarea
+                                                value={otherComment}
+                                                onChange={(e) =>
+                                                    setOtherComment(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                onKeyDown={
+                                                    onOtherCommentKeyDown
+                                                }
+                                                placeholder="Enterで送信 / Shift+Enterで改行"
+                                                style={styles.myTextarea}
+                                                rows={2}
+                                            />
+                                            <button
+                                                style={styles.sendBtn}
+                                                onClick={
+                                                    submitCommentToSelected
+                                                }
+                                            >
+                                                送信
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* logs */}
+                                <div style={styles.logs}>
+                                    {selectedUser.logs.map((log) => {
+                                        const di = doingInfo(log.doingKey);
+                                        return (
+                                            <div
+                                                key={log.doingKey}
+                                                style={styles.logBlock}
+                                            >
+                                                <div style={styles.logHeading}>
                                                     <span
                                                         style={{
                                                             marginRight: 8,
                                                         }}
                                                     >
-                                                        {d.emoji}
+                                                        {di.emoji}
                                                     </span>
                                                     <span
                                                         style={{
-                                                            fontWeight: 900,
+                                                            fontWeight: 800,
                                                         }}
                                                     >
-                                                        {d.label}
+                                                        {di.label}
                                                     </span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                                                    <span
+                                                        style={styles.logTime}
+                                                    >
+                                                        {formatDoingStartTime(
+                                                            log.startedAt,
+                                                        )}
+                                                    </span>
+                                                </div>
 
-                                    <div style={styles.myCommentRow}>
-                                        <textarea
-                                            value={myComment}
-                                            onChange={(e) =>
-                                                setMyComment(e.target.value)
-                                            }
-                                            onKeyDown={onMyCommentKeyDown}
-                                            placeholder="いまのdoingにコメント（Enterで送信 / Shift+Enterで改行）"
-                                            style={styles.myTextarea}
-                                            rows={2}
-                                        />
-                                        <button
-                                            style={styles.sendBtn}
-                                            onClick={submitMyComment}
-                                        >
-                                            送信
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* 他人操作: その人の「今のdoing」にコメント */}
-                            {!isSelectedMe && (
-                                <div style={styles.myControls}>
-                                    <div
-                                        style={{
-                                            fontWeight: 900,
-                                            fontSize: 12,
-                                            opacity: 0.85,
-                                        }}
-                                    >
-                                        {(() => {
-                                            const di = doingInfo(
-                                                selectedUser.currentDoing,
-                                            );
-                                            return (
-                                                <>
-                                                    {selectedUser.name}さんの「
-                                                    {di.emoji} {di.label}
-                                                    」にコメント
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
-
-                                    <div style={styles.myCommentRow}>
-                                        <textarea
-                                            value={otherComment}
-                                            onChange={(e) =>
-                                                setOtherComment(e.target.value)
-                                            }
-                                            onKeyDown={onOtherCommentKeyDown}
-                                            placeholder="Enterで送信 / Shift+Enterで改行"
-                                            style={styles.myTextarea}
-                                            rows={2}
-                                        />
-                                        <button
-                                            style={styles.sendBtn}
-                                            onClick={submitCommentToSelected}
-                                        >
-                                            送信
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* logs with headings */}
-                            <div style={styles.logs}>
-                                {selectedUser.logs.map((log) => {
-                                    const di = doingInfo(log.doingKey);
-                                    return (
-                                        <div
-                                            key={log.doingKey}
-                                            style={styles.logBlock}
-                                        >
-                                            <div style={styles.logHeading}>
-                                                <span
-                                                    style={{ marginRight: 8 }}
-                                                >
-                                                    {di.emoji}
-                                                </span>
-                                                <span
-                                                    style={{ fontWeight: 800 }}
-                                                >
-                                                    {di.label}
-                                                </span>
-                                                <span style={styles.logTime}>
-                                                    {formatDoingStartTime(
-                                                        log.startedAt,
-                                                    )}
-                                                </span>
-                                            </div>
-
-                                            <div style={styles.msgList}>
-                                                {log.messages.length === 0 ? (
-                                                    <div style={styles.msgHint}>
-                                                        （まだコメントなし）
-                                                    </div>
-                                                ) : (
-                                                    log.messages.map(
-                                                        (m, idx) => (
-                                                            <div
-                                                                key={idx}
-                                                                style={{
-                                                                    ...styles.msgRow,
-                                                                    justifyContent:
-                                                                        m.side ===
-                                                                        "other"
-                                                                            ? "flex-end"
-                                                                            : "flex-start",
-                                                                }}
-                                                            >
+                                                <div style={styles.msgList}>
+                                                    {log.messages.length ===
+                                                    0 ? (
+                                                        <div
+                                                            style={
+                                                                styles.msgHint
+                                                            }
+                                                        >
+                                                            （まだコメントなし）
+                                                        </div>
+                                                    ) : (
+                                                        log.messages.map(
+                                                            (m, idx) => (
                                                                 <div
+                                                                    key={idx}
                                                                     style={{
-                                                                        ...styles.msgBubble,
-                                                                        background:
+                                                                        ...styles.msgRow,
+                                                                        justifyContent:
                                                                             m.side ===
                                                                             "other"
-                                                                                ? "#4A90E2"
-                                                                                : "#F0F0F0",
-                                                                        borderColor:
-                                                                            m.side ===
-                                                                            "other"
-                                                                                ? "#4A90E2"
-                                                                                : "rgba(0,0,0,0.10)",
-                                                                        color:
-                                                                            m.side ===
-                                                                            "other"
-                                                                                ? "#FFFFFF"
-                                                                                : "#333",
+                                                                                ? "flex-end"
+                                                                                : "flex-start",
                                                                     }}
                                                                 >
-                                                                    {m.text}
-                                                                    {m.side ===
-                                                                        "other" && (
-                                                                        <button
-                                                                            style={
-                                                                                styles.otherTag
-                                                                            }
-                                                                            onClick={() => {
-                                                                                setSelectedUserId(
-                                                                                    m.authorUserId,
-                                                                                );
-                                                                            }}
-                                                                            title={`${m.authorName}さんを見る`}
-                                                                        >
-                                                                            {
-                                                                                m.authorName
-                                                                            }
-                                                                        </button>
-                                                                    )}
+                                                                    <div
+                                                                        style={{
+                                                                            ...styles.msgBubble,
+                                                                            background:
+                                                                                m.side ===
+                                                                                "other"
+                                                                                    ? "#4A90E2"
+                                                                                    : "#F0F0F0",
+                                                                            borderColor:
+                                                                                m.side ===
+                                                                                "other"
+                                                                                    ? "#4A90E2"
+                                                                                    : "rgba(0,0,0,0.10)",
+                                                                            color:
+                                                                                m.side ===
+                                                                                "other"
+                                                                                    ? "#FFFFFF"
+                                                                                    : "#333",
+                                                                        }}
+                                                                    >
+                                                                        {m.text}
+                                                                        {m.side ===
+                                                                            "other" && (
+                                                                            <button
+                                                                                style={
+                                                                                    styles.otherTag
+                                                                                }
+                                                                                onClick={() =>
+                                                                                    setSelectedUserId(
+                                                                                        m.authorUserId,
+                                                                                    )
+                                                                                }
+                                                                                title={`${m.authorName}さんを見る`}
+                                                                            >
+                                                                                {
+                                                                                    m.authorName
+                                                                                }
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        ),
-                                                    )
-                                                )}
+                                                            ),
+                                                        )
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={styles.drawerList}>
+                                {usersView.map((u) => {
+                                    const d = doingInfo(u.currentDoing);
+                                    return (
+                                        <button
+                                            key={u.id}
+                                            onClick={() =>
+                                                onPickUserFromMenu(u.id)
+                                            }
+                                            style={styles.userRow}
+                                        >
+                                            <span
+                                                style={{
+                                                    ...styles.userDot,
+                                                    background: d.color,
+                                                }}
+                                            />
+                                            <span style={styles.userName}>
+                                                {u.name}
+                                            </span>
+                                            <span style={styles.userDoing}>
+                                                {d.emoji} {d.label}
+                                            </span>
+                                        </button>
                                     );
                                 })}
                             </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Right drawer */}
-                <div style={styles.drawer}>
-                    <div style={styles.drawerHeader}>みんなたち</div>
-
-                    <div style={styles.drawerList}>
-                        {usersView.map((u) => {
-                            const d = doingInfo(u.currentDoing);
-                            const isSelected = u.id === selectedUserId;
-
-                            return (
-                                <button
-                                    key={u.id}
-                                    onClick={() => onPickUserFromMenu(u.id)}
-                                    style={{
-                                        ...styles.userRow,
-                                        background: isSelected
-                                            ? "rgba(255,255,255,0.14)"
-                                            : "transparent",
-                                    }}
-                                >
-                                    <span
-                                        style={{
-                                            ...styles.userDot,
-                                            background: d.color,
-                                        }}
-                                    />
-                                    <span style={styles.userName}>
-                                        {u.name}
-                                    </span>
-                                    <span style={styles.userDoing}>
-                                        {d.emoji} {d.label}
-                                    </span>
-                                </button>
-                            );
-                        })}
+                        )}
                     </div>
                 </div>
             </div>
