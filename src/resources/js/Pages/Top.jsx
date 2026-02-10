@@ -15,15 +15,93 @@ import "./Top.css";
 const CURRENT_USER_ID = 1; // なお
 
 // =========================
+// Mock "Topics"（5分ごとに切り替わる）
+// =========================
+const TOPICS = [
+    { id: "t1", title: "いま飲んでるものは？", desc: "水でもコーヒーでも☺️" },
+    { id: "t2", title: "今日いちばん進んだことは？", desc: "小さくてもOK！" },
+    { id: "t3", title: "最近ハマってる作業BGMは？", desc: "音なしでも可！" },
+    { id: "t4", title: "いまの気分を絵文字1つで！", desc: "🙂😇😪🥺🔥 など" },
+    { id: "t5", title: "今日のごほうび、何にする？", desc: "甘いの？寝る？" },
+    { id: "t6", title: "今やってること、一言で！", desc: "勉強/仕事/休憩など" },
+];
+
+// =========================
+// Mock "Radio tracks"（UIだけ。音は後でHowlerに差し替え）
+// =========================
+const RADIO_TRACKS = [
+    { id: "r1", title: "Lo-fi Afternoon", artist: "zatsudan DJ" },
+    { id: "r2", title: "Rainy Coding", artist: "zatsudan DJ" },
+    { id: "r3", title: "Midnight Study", artist: "zatsudan DJ" },
+];
+
+// =========================
 // Mock "DB tables"
 // =========================
 const DOINGS = [
-    { key: "study", label: "勉強", emoji: "📚", color: "#3B82F6" },
-    { key: "movie", label: "映画鑑賞", emoji: "🍿", color: "#F97316" },
-    { key: "work", label: "仕事", emoji: "💻", color: "#10B981" },
-    { key: "game", label: "ゲーム", emoji: "🎮", color: "#EC4899" },
-    { key: "clean", label: "お掃除", emoji: "🧹", color: "#A855F7" },
-    { key: "think", label: "考え中", emoji: "💭", color: "#F59E0B" },
+    {
+        key: "study",
+        label: "勉強",
+        emoji: "📚",
+        color: "#3B82F6",
+        moveChance: 0.3,
+        moveDistance: 4,
+        cssAnim: "doing-subtle-wobble 3s ease-in-out infinite",
+    },
+    {
+        key: "movie",
+        label: "映画鑑賞",
+        emoji: "🍿",
+        color: "#F97316",
+        moveChance: 0.1,
+        moveDistance: 2,
+        cssAnim: "doing-bounce 4s ease-in-out infinite",
+    },
+    {
+        key: "work",
+        label: "仕事",
+        emoji: "💻",
+        color: "#10B981",
+        moveChance: 0.5,
+        moveDistance: 6,
+        cssAnim: "doing-shake 2s ease-in-out infinite",
+    },
+    {
+        key: "game",
+        label: "ゲーム",
+        emoji: "🎮",
+        color: "#EC4899",
+        moveChance: 1.0,
+        moveDistance: 25,
+        cssAnim: "doing-energetic 0.5s ease-in-out infinite",
+    },
+    {
+        key: "clean",
+        label: "お掃除",
+        emoji: "🧹",
+        color: "#A855F7",
+        moveChance: 0.7,
+        moveDistance: 10,
+        cssAnim: "doing-sway 2s ease-in-out infinite",
+    },
+    {
+        key: "think",
+        label: "考え中",
+        emoji: "💭",
+        color: "#F59E0B",
+        moveChance: 0.2,
+        moveDistance: 3,
+        cssAnim: "doing-float 4s ease-in-out infinite",
+    },
+    {
+        key: "idle",
+        label: "何もしてない",
+        emoji: "",
+        color: "#9CA3AF",
+        moveChance: 0,
+        moveDistance: 0,
+        cssAnim: "none",
+    },
 ];
 
 const USERS = [
@@ -86,6 +164,28 @@ function formatDoingStartTime(startedAt) {
 // =========================
 // Mock data builders
 // =========================
+
+//topcコメント用の初期データビルダー
+function buildInitialTopicComments() {
+    const now = Date.now();
+    // ちょい雰囲気だけ入れとく
+    return [
+        {
+            id: `tc-1`,
+            topic_id: "t1",
+            author_user_id: 2,
+            text: "白湯〜",
+            created_at: now - 1000 * 60 * 2,
+        },
+        {
+            id: `tc-2`,
+            topic_id: "t1",
+            author_user_id: 1,
+            text: "コーヒー☺️",
+            created_at: now - 1000 * 60 * 1,
+        },
+    ];
+}
 
 /**
  * 点の初期配置（重なりにくく）
@@ -216,6 +316,35 @@ export default function Top() {
         buildInitialAvatarStates(USERS.map((u) => u.id)),
     );
 
+    // ---- Topic state ----
+    const [currentTopic, setCurrentTopic] = useState(() => TOPICS[0]);
+    const [topicOverlay, setTopicOverlay] = useState(null);
+    const [isTopicPanelOpen, setIsTopicPanelOpen] = useState(false);
+
+    const [topicComments, setTopicComments] = useState(() =>
+        buildInitialTopicComments(),
+    );
+    const [topicComment, setTopicComment] = useState(""); // 入力欄
+    const overlayTimerRef = useRef(null);
+
+    // ---- Radio UI state（音はまだ鳴らさない：UIだけ）----
+    const [radioOn, setRadioOn] = useState(() => {
+        try {
+            return localStorage.getItem("z_radio_on") === "1";
+        } catch {
+            return false;
+        }
+    });
+    const [radioVolume, setRadioVolume] = useState(() => {
+        try {
+            const v = localStorage.getItem("z_radio_vol");
+            return v ? Number(v) : 0.35;
+        } catch {
+            return 0.35;
+        }
+    });
+    const [radioTrack, setRadioTrack] = useState(() => RADIO_TRACKS[0]);
+
     // UI state
     const [selectedUserId, setSelectedUserId] = useState(null);
 
@@ -301,6 +430,13 @@ export default function Top() {
                 .slice()
                 .sort((a, b) => a.created_at - b.created_at)
                 .map((m) => {
+                    if (m.isSystem) {
+                        return {
+                            side: "system",
+                            text: m.text,
+                            isSystem: true,
+                        };
+                    }
                     const side =
                         m.author_user_id === selectedUserId ? "self" : "other";
                     const author = dbUsers.find(
@@ -333,6 +469,29 @@ export default function Top() {
 
     const isSelectedMe = selectedUser?.id === CURRENT_USER_ID;
 
+    const currentTopicComments = useMemo(() => {
+        const list = topicComments
+            .filter((c) => c.topic_id === currentTopic.id)
+            .slice()
+            .sort((a, b) => a.created_at - b.created_at)
+            .slice(-30);
+
+        return list.map((c) => {
+            const author = dbUsers.find((u) => u.id === c.author_user_id);
+            const side =
+                c.author_user_id === CURRENT_USER_ID ? "other" : "self";
+            // ↑ “右寄せ/左寄せ” を doing と合わせたいならここを調整
+            // ここでは「自分の発言を右寄せ」にしたいなら side を逆にしてOK
+            return {
+                id: c.id,
+                text: c.text,
+                authorName: author?.name ?? "?",
+                authorUserId: c.author_user_id,
+                side: c.author_user_id === CURRENT_USER_ID ? "other" : "self",
+            };
+        });
+    }, [topicComments, currentTopic.id, dbUsers]);
+
     // -------------------------
     // interactions
     // -------------------------
@@ -360,12 +519,38 @@ export default function Top() {
             const currentKey = getCurrentDoingKey(CURRENT_USER_ID, prev);
             if (currentKey === doingKey) return prev;
 
+            const currentUd = getCurrentUserDoing(CURRENT_USER_ID, prev);
+
             const newUserDoing = {
                 id: `ud-${CURRENT_USER_ID}-${now}-${Math.random().toString(16).slice(2)}`,
                 user_id: CURRENT_USER_ID,
                 doing_key: doingKey,
                 started_at: now,
             };
+
+            // システムメッセージ（終了 + 開始）
+            setDoingMessages((msgs) => {
+                const sysMsgs = [];
+                if (currentUd) {
+                    sysMsgs.push({
+                        id: `sys-${currentUd.id}-end-${now}`,
+                        user_doing_id: currentUd.id,
+                        author_user_id: CURRENT_USER_ID,
+                        text: `${doingInfo(currentKey).label}を終了しました`,
+                        created_at: now,
+                        isSystem: true,
+                    });
+                }
+                sysMsgs.push({
+                    id: `sys-${newUserDoing.id}-start-${now}`,
+                    user_doing_id: newUserDoing.id,
+                    author_user_id: CURRENT_USER_ID,
+                    text: `${doingInfo(doingKey).label}を開始しました`,
+                    created_at: now + 1,
+                    isSystem: true,
+                });
+                return [...msgs, ...sysMsgs];
+            });
 
             // timeline
             setTimeline((tl) => {
@@ -379,6 +564,41 @@ export default function Top() {
 
             return [newUserDoing, ...prev].slice(0, 300);
         });
+    };
+
+    const submitTopicComment = () => {
+        const text = topicComment.trim();
+        if (!text) return;
+
+        const now = Date.now();
+        setTopicComments((prev) => [
+            ...prev,
+            {
+                id: `tc-${currentTopic.id}-${now}-${Math.random().toString(16).slice(2)}`,
+                topic_id: currentTopic.id,
+                author_user_id: CURRENT_USER_ID,
+                text,
+                created_at: now,
+            },
+        ]);
+
+        // timelineにも流す（場の空気）
+        setTimeline((tl) => {
+            const item = {
+                id: `topicc-${now}-${Math.random()}`,
+                text: `💬 ${currentUser.name}さんが テーマ「${currentTopic.title}」にコメントしました`,
+            };
+            return [...tl, item].slice(-20);
+        });
+
+        setTopicComment("");
+    };
+
+    const onTopicCommentKeyDown = (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            submitTopicComment();
+        }
     };
 
     /**
@@ -452,6 +672,81 @@ export default function Top() {
         }
     };
 
+    useEffect(() => {
+        try {
+            localStorage.setItem("z_radio_on", radioOn ? "1" : "0");
+        } catch {}
+    }, [radioOn]);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem("z_radio_vol", String(radioVolume));
+        } catch {}
+    }, [radioVolume]);
+
+    // 曲は “雰囲気” のために 8分ごとに変える（UI表示が変わるだけ）
+    useEffect(() => {
+        const TRACK_MS = 8 * 60 * 1000;
+        const tick = () => {
+            const slot = Math.floor(Date.now() / TRACK_MS);
+            const idx = slot % RADIO_TRACKS.length;
+            setRadioTrack(RADIO_TRACKS[idx]);
+        };
+        tick();
+        const t = setInterval(tick, 5000);
+        return () => clearInterval(t);
+    }, []);
+
+    useEffect(() => {
+        const INTERVAL_MS = 5 * 60 * 1000; // 5分（テストなら 10*1000 などに）
+        const CHECK_MS = 3000; // 3秒おきに切替境目を検知
+
+        const getTopicByTime = () => {
+            const slot = Math.floor(Date.now() / INTERVAL_MS);
+            const idx = slot % TOPICS.length;
+            return TOPICS[idx];
+        };
+
+        const announce = (topic) => {
+            if (overlayTimerRef.current) clearTimeout(overlayTimerRef.current);
+            setTopicOverlay({ ...topic, announcedAt: Date.now() });
+
+            overlayTimerRef.current = setTimeout(
+                () => setTopicOverlay(null),
+                3800,
+            );
+        };
+
+        const first = getTopicByTime();
+        setCurrentTopic(first);
+        announce(first);
+
+        const t = setInterval(() => {
+            const next = getTopicByTime();
+            setCurrentTopic((prev) => {
+                if (!prev || prev.id !== next.id) {
+                    announce(next);
+                    setTimeline((tl) => {
+                        const item = {
+                            id: `topic-${Date.now()}-${Math.random()}`,
+                            text: `📻 テーマが変わりました：${next.title}`,
+                        };
+                        return [...tl, item].slice(-20);
+                    });
+                    // テーマが変わった瞬間、テーマパネルが開いてたら入力を消す（好み）
+                    setTopicComment("");
+                    return next;
+                }
+                return prev;
+            });
+        }, CHECK_MS);
+
+        return () => {
+            clearInterval(t);
+            if (overlayTimerRef.current) clearTimeout(overlayTimerRef.current);
+        };
+    }, []);
+
     // -------------------------
     // "賑やかさ"：他人だけ 2.5秒ごとに doing 更新（自分は触らない）
     // -------------------------
@@ -463,7 +758,10 @@ export default function Top() {
                 const now = Date.now();
 
                 const currentKey = getCurrentDoingKey(who.id, prev);
-                const newDoing = pick(dbDoings).key;
+                const currentUd = getCurrentUserDoing(who.id, prev);
+                const newDoing = pick(
+                    dbDoings.filter((d) => d.key !== "idle"),
+                ).key;
                 if (newDoing === currentKey) return prev;
 
                 const newUserDoing = {
@@ -473,17 +771,36 @@ export default function Top() {
                     started_at: now,
                 };
 
-                // その人本人の一言を自動で付ける（author_user_id = 本人）
-                setDoingMessages((msgs) => [
-                    ...msgs,
-                    {
+                // システムメッセージ + 本人の一言
+                setDoingMessages((msgs) => {
+                    const newMsgs = [];
+                    if (currentUd) {
+                        newMsgs.push({
+                            id: `sys-${currentUd.id}-end-${now}`,
+                            user_doing_id: currentUd.id,
+                            author_user_id: who.id,
+                            text: `${doingInfo(currentKey).label}を終了しました`,
+                            created_at: now,
+                            isSystem: true,
+                        });
+                    }
+                    newMsgs.push({
+                        id: `sys-${newUserDoing.id}-start-${now}`,
+                        user_doing_id: newUserDoing.id,
+                        author_user_id: who.id,
+                        text: `${doingInfo(newDoing).label}を開始しました`,
+                        created_at: now + 1,
+                        isSystem: true,
+                    });
+                    newMsgs.push({
                         id: `m-${newUserDoing.id}-1`,
                         user_doing_id: newUserDoing.id,
                         author_user_id: who.id,
                         text: "はじめよ〜",
-                        created_at: now + 1,
-                    },
-                ]);
+                        created_at: now + 2,
+                    });
+                    return [...msgs, ...newMsgs];
+                });
 
                 setTimeline((tl) => {
                     const text = `${who.name}さんが ${doingInfo(newDoing).label} をしています`;
@@ -502,8 +819,11 @@ export default function Top() {
     }, [dbUsers, dbDoings]);
 
     // -------------------------
-    // 漂い（avatar_states更新）
+    // 漂い（avatar_states更新）— doing別の動きプロファイルを適用
     // -------------------------
+    const usersViewRef = useRef(usersView);
+    usersViewRef.current = usersView;
+
     useEffect(() => {
         const interval = setInterval(() => {
             setAvatarStates((prev) => {
@@ -516,10 +836,27 @@ export default function Top() {
                 const maxX = Math.max(minX + 1, rect.width - 28);
                 const maxY = Math.max(minY + 1, rect.height - 28);
 
+                const currentUsersView = usersViewRef.current;
+
                 return prev.map((a) => {
-                    const bias = a.user_id === selectedUserId ? 0.25 : 1.0;
-                    const dx = (Math.random() - 0.5) * 18 * bias;
-                    const dy = (Math.random() - 0.5) * 18 * bias;
+                    const uv = currentUsersView.find((u) => u.id === a.user_id);
+                    const di = uv ? doingInfo(uv.currentDoing) : DOINGS[0];
+
+                    // doing別の移動確率と距離
+                    const moveChance = di.moveChance ?? 1.0;
+                    const moveDistance = di.moveDistance ?? 18;
+
+                    // 選択中のユーザーは動きを抑制
+                    const selectBias =
+                        a.user_id === selectedUserId ? 0.25 : 1.0;
+
+                    // 確率チェック: 動かない場合はそのまま返す
+                    if (Math.random() > moveChance) return a;
+
+                    const dx =
+                        (Math.random() - 0.5) * moveDistance * selectBias;
+                    const dy =
+                        (Math.random() - 0.5) * moveDistance * selectBias;
                     return {
                         ...a,
                         x: clamp(a.x + dx, minX, maxX),
@@ -534,6 +871,66 @@ export default function Top() {
 
     return (
         <div style={styles.page}>
+            {/* Topic overlay */}
+            {topicOverlay && (
+                <div
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        pointerEvents: "none",
+                        zIndex: 9999,
+                    }}
+                >
+                    <div
+                        style={{
+                            padding: "14px 16px",
+                            borderRadius: 16,
+                            background: "rgba(255,255,255,0.92)",
+                            border: "1px solid rgba(0,0,0,0.10)",
+                            boxShadow: "0 18px 40px rgba(0,0,0,0.12)",
+                            backdropFilter: "blur(10px)",
+                            maxWidth: 520,
+                            width: "min(520px, calc(100vw - 48px))",
+                            transform: "translateY(-10px)",
+                            animation: "topic-pop 3.8s ease-in-out forwards",
+                        }}
+                    >
+                        <div
+                            style={{
+                                fontSize: 12,
+                                opacity: 0.7,
+                                fontWeight: 800,
+                            }}
+                        >
+                            🔔 今日のテーマ
+                        </div>
+                        <div
+                            style={{
+                                fontSize: 18,
+                                fontWeight: 900,
+                                marginTop: 6,
+                            }}
+                        >
+                            {topicOverlay.title}
+                        </div>
+                        {topicOverlay.desc ? (
+                            <div
+                                style={{
+                                    fontSize: 13,
+                                    opacity: 0.8,
+                                    marginTop: 6,
+                                }}
+                            >
+                                {topicOverlay.desc}
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
+            )}
+
             {/* Top bar */}
             <div style={styles.topbar}>
                 <div style={styles.brand}>
@@ -588,16 +985,17 @@ export default function Top() {
                                 <span
                                     style={{
                                         ...styles.dotCore,
-                                        // background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9), ${d.color} 55%, rgba(0,0,0,0.15) 120%)`,
                                         backgroundImage:
                                             'url("/images/avatar/test.png")',
                                         backgroundSize: "cover",
                                         backgroundPosition: "center",
                                         backgroundRepeat: "no-repeat",
+                                        animation: d.cssAnim || "none",
                                     }}
                                 />
                                 <span style={styles.dotLabel}>
-                                    {d.emoji} {u.name}
+                                    {d.emoji ? `${d.emoji} ` : ""}
+                                    {u.name}
                                 </span>
                             </button>
                         );
@@ -628,6 +1026,317 @@ export default function Top() {
 
                     {/* 中身 */}
                     <div style={styles.drawerBody}>
+                        {/* ===== Topic + Radio (always visible) ===== */}
+                        <div style={{ marginBottom: 12 }}>
+                            {/* Radio mini */}
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: 10,
+                                    padding: "10px 12px",
+                                    borderRadius: 12,
+                                    background: "rgba(255,255,255,0.85)",
+                                    border: "1px solid rgba(0,0,0,0.08)",
+                                    marginBottom: 10,
+                                }}
+                            >
+                                <div style={{ minWidth: 0 }}>
+                                    <div
+                                        style={{
+                                            fontSize: 12,
+                                            opacity: 0.7,
+                                            fontWeight: 900,
+                                        }}
+                                    >
+                                        📻 Radio
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: 900,
+                                            whiteSpace: "nowrap",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                        }}
+                                    >
+                                        ♪ {radioTrack.title} —{" "}
+                                        {radioTrack.artist}
+                                    </div>
+                                </div>
+
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 10,
+                                    }}
+                                >
+                                    <button
+                                        onClick={() => setRadioOn((v) => !v)}
+                                        style={{
+                                            padding: "8px 10px",
+                                            borderRadius: 10,
+                                            border: "1px solid rgba(0,0,0,0.10)",
+                                            background: radioOn
+                                                ? "rgba(0,0,0,0.06)"
+                                                : "#fff",
+                                            fontWeight: 900,
+                                            cursor: "pointer",
+                                        }}
+                                        title="（mock）いまは音は鳴らさずUIだけ"
+                                    >
+                                        {radioOn ? "ON" : "OFF"}
+                                    </button>
+
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="1"
+                                        step="0.01"
+                                        value={radioVolume}
+                                        onChange={(e) =>
+                                            setRadioVolume(
+                                                Number(e.target.value),
+                                            )
+                                        }
+                                        style={{ width: 80 }}
+                                        title={`Volume: ${Math.round(radioVolume * 100)}%`}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Topic card */}
+                            <button
+                                onClick={() => setIsTopicPanelOpen((v) => !v)}
+                                style={{
+                                    width: "100%",
+                                    textAlign: "left",
+                                    padding: "10px 12px",
+                                    borderRadius: 12,
+                                    background: "rgba(255,255,255,0.85)",
+                                    border: "1px solid rgba(0,0,0,0.08)",
+                                    cursor: "pointer",
+                                }}
+                                title="クリックでテーマのコメント欄を開く"
+                            >
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        gap: 10,
+                                    }}
+                                >
+                                    <div style={{ minWidth: 0 }}>
+                                        <div
+                                            style={{
+                                                fontSize: 12,
+                                                opacity: 0.7,
+                                                fontWeight: 900,
+                                            }}
+                                        >
+                                            🔔 今のテーマ
+                                        </div>
+                                        <div
+                                            style={{
+                                                fontSize: 13,
+                                                fontWeight: 900,
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                            }}
+                                        >
+                                            {currentTopic.title}
+                                        </div>
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: 12,
+                                            opacity: 0.65,
+                                            fontWeight: 900,
+                                        }}
+                                    >
+                                        {isTopicPanelOpen ? "▲" : "▼"}
+                                    </div>
+                                </div>
+
+                                {currentTopic.desc ? (
+                                    <div
+                                        style={{
+                                            marginTop: 6,
+                                            fontSize: 12,
+                                            opacity: 0.75,
+                                        }}
+                                    >
+                                        {currentTopic.desc}
+                                    </div>
+                                ) : null}
+                            </button>
+
+                            {/* Topic panel */}
+                            {isTopicPanelOpen && (
+                                <div
+                                    style={{
+                                        marginTop: 10,
+                                        padding: "10px 12px",
+                                        borderRadius: 12,
+                                        background: "rgba(255,255,255,0.78)",
+                                        border: "1px solid rgba(0,0,0,0.08)",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: 900,
+                                            opacity: 0.8,
+                                            marginBottom: 8,
+                                        }}
+                                    >
+                                        💬 テーマへのコメント
+                                    </div>
+
+                                    {/* コメント一覧（doingの見た目を流用） */}
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: 8,
+                                            maxHeight: 220,
+                                            overflow: "auto",
+                                            paddingRight: 4,
+                                        }}
+                                    >
+                                        {currentTopicComments.length === 0 ? (
+                                            <div
+                                                style={{
+                                                    fontSize: 12,
+                                                    opacity: 0.6,
+                                                }}
+                                            >
+                                                （まだコメントなし）
+                                            </div>
+                                        ) : (
+                                            currentTopicComments.map((m) => (
+                                                <div
+                                                    key={m.id}
+                                                    style={{
+                                                        display: "flex",
+                                                        justifyContent:
+                                                            m.authorUserId ===
+                                                            CURRENT_USER_ID
+                                                                ? "flex-end"
+                                                                : "flex-start",
+                                                    }}
+                                                >
+                                                    <div
+                                                        style={{
+                                                            padding: "8px 10px",
+                                                            borderRadius: 12,
+                                                            border: "1px solid rgba(0,0,0,0.10)",
+                                                            background:
+                                                                m.authorUserId ===
+                                                                CURRENT_USER_ID
+                                                                    ? "#4A90E2"
+                                                                    : "#F0F0F0",
+                                                            color:
+                                                                m.authorUserId ===
+                                                                CURRENT_USER_ID
+                                                                    ? "#fff"
+                                                                    : "#333",
+                                                            maxWidth: "90%",
+                                                            fontSize: 13,
+                                                            lineHeight: 1.35,
+                                                            position:
+                                                                "relative",
+                                                        }}
+                                                        title={m.authorName}
+                                                    >
+                                                        {m.text}
+                                                        {m.authorUserId !==
+                                                            CURRENT_USER_ID && (
+                                                            <button
+                                                                style={{
+                                                                    marginLeft: 10,
+                                                                    padding:
+                                                                        "2px 8px",
+                                                                    borderRadius: 999,
+                                                                    border: "1px solid rgba(0,0,0,0.10)",
+                                                                    background:
+                                                                        "rgba(255,255,255,0.35)",
+                                                                    color:
+                                                                        m.authorUserId ===
+                                                                        CURRENT_USER_ID
+                                                                            ? "#fff"
+                                                                            : "#333",
+                                                                    fontSize: 11,
+                                                                    fontWeight: 900,
+                                                                    cursor: "pointer",
+                                                                }}
+                                                                onClick={() =>
+                                                                    setSelectedUserId(
+                                                                        m.authorUserId,
+                                                                    )
+                                                                }
+                                                                title={`${m.authorName}さんを見る`}
+                                                            >
+                                                                {m.authorName}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+
+                                    {/* 入力欄 */}
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            gap: 8,
+                                            marginTop: 10,
+                                            alignItems: "stretch",
+                                        }}
+                                    >
+                                        <textarea
+                                            value={topicComment}
+                                            onChange={(e) =>
+                                                setTopicComment(e.target.value)
+                                            }
+                                            onKeyDown={onTopicCommentKeyDown}
+                                            placeholder="テーマにひとこと（Enterで送信 / Shift+Enterで改行）"
+                                            style={{
+                                                flex: 1,
+                                                resize: "none",
+                                                borderRadius: 12,
+                                                border: "1px solid rgba(0,0,0,0.10)",
+                                                padding: "8px 10px",
+                                                fontSize: 13,
+                                                outline: "none",
+                                                background: "#fff",
+                                            }}
+                                            rows={2}
+                                        />
+                                        <button
+                                            onClick={submitTopicComment}
+                                            style={{
+                                                padding: "8px 12px",
+                                                borderRadius: 12,
+                                                border: "1px solid rgba(0,0,0,0.10)",
+                                                background: "#fff",
+                                                fontWeight: 900,
+                                                cursor: "pointer",
+                                                whiteSpace: "nowrap",
+                                            }}
+                                        >
+                                            送信
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         {selectedUser ? (
                             <div style={styles.drawerDetailOverlay}>
                                 {/* 自分操作 */}
@@ -644,45 +1353,74 @@ export default function Top() {
                                         </div>
 
                                         <div style={styles.myDoingGrid}>
-                                            {dbDoings.map((d) => {
-                                                const active =
-                                                    d.key ===
-                                                    selectedUser.currentDoing;
-                                                return (
-                                                    <button
-                                                        key={d.key}
-                                                        onClick={() =>
-                                                            setMyDoing(d.key)
-                                                        }
-                                                        style={{
-                                                            ...styles.doingChip,
-                                                            borderColor: active
-                                                                ? "rgba(0,0,0,0.22)"
-                                                                : "rgba(0,0,0,0.10)",
-                                                            background: active
-                                                                ? "rgba(0,0,0,0.04)"
-                                                                : "#FFFFFF",
-                                                        }}
-                                                        title={d.label}
-                                                    >
-                                                        <span
+                                            {dbDoings
+                                                .filter((d) => d.key !== "idle")
+                                                .map((d) => {
+                                                    const active =
+                                                        d.key ===
+                                                        selectedUser.currentDoing;
+                                                    return (
+                                                        <button
+                                                            key={d.key}
+                                                            onClick={() =>
+                                                                setMyDoing(
+                                                                    d.key,
+                                                                )
+                                                            }
                                                             style={{
-                                                                marginRight: 8,
+                                                                ...styles.doingChip,
+                                                                borderColor:
+                                                                    active
+                                                                        ? "rgba(0,0,0,0.22)"
+                                                                        : "rgba(0,0,0,0.10)",
+                                                                background:
+                                                                    active
+                                                                        ? "rgba(0,0,0,0.04)"
+                                                                        : "#FFFFFF",
                                                             }}
+                                                            title={d.label}
                                                         >
-                                                            {d.emoji}
-                                                        </span>
-                                                        <span
-                                                            style={{
-                                                                fontWeight: 900,
-                                                            }}
-                                                        >
-                                                            {d.label}
-                                                        </span>
-                                                    </button>
-                                                );
-                                            })}
+                                                            <span
+                                                                style={{
+                                                                    marginRight: 8,
+                                                                }}
+                                                            >
+                                                                {d.emoji}
+                                                            </span>
+                                                            <span
+                                                                style={{
+                                                                    fontWeight: 900,
+                                                                }}
+                                                            >
+                                                                {d.label}
+                                                            </span>
+                                                        </button>
+                                                    );
+                                                })}
                                         </div>
+
+                                        <button
+                                            onClick={() => setMyDoing("idle")}
+                                            disabled={
+                                                selectedUser.currentDoing ===
+                                                "idle"
+                                            }
+                                            style={{
+                                                ...styles.stopBtn,
+                                                opacity:
+                                                    selectedUser.currentDoing ===
+                                                    "idle"
+                                                        ? 0.4
+                                                        : 1,
+                                                cursor:
+                                                    selectedUser.currentDoing ===
+                                                    "idle"
+                                                        ? "default"
+                                                        : "pointer",
+                                            }}
+                                        >
+                                            終了する
+                                        </button>
 
                                         <div style={styles.myCommentRow}>
                                             <textarea
@@ -758,12 +1496,21 @@ export default function Top() {
 
                                 {/* logs */}
                                 <div style={styles.logs}>
-                                    {selectedUser.logs.map((log) => {
+                                    {selectedUser.logs.map((log, logIdx) => {
                                         const di = doingInfo(log.doingKey);
+                                        const isCurrent = logIdx === 0;
                                         return (
                                             <div
                                                 key={log.doingKey}
-                                                style={styles.logBlock}
+                                                style={{
+                                                    ...styles.logBlock,
+                                                    ...(isCurrent
+                                                        ? {
+                                                              borderLeft:
+                                                                  "3px solid #3B82F6",
+                                                          }
+                                                        : { opacity: 0.5 }),
+                                                }}
                                             >
                                                 <div style={styles.logHeading}>
                                                     <span
@@ -801,60 +1548,76 @@ export default function Top() {
                                                         </div>
                                                     ) : (
                                                         log.messages.map(
-                                                            (m, idx) => (
-                                                                <div
-                                                                    key={idx}
-                                                                    style={{
-                                                                        ...styles.msgRow,
-                                                                        justifyContent:
-                                                                            m.side ===
-                                                                            "other"
-                                                                                ? "flex-end"
-                                                                                : "flex-start",
-                                                                    }}
-                                                                >
+                                                            (m, idx) =>
+                                                                m.isSystem ? (
                                                                     <div
-                                                                        style={{
-                                                                            ...styles.msgBubble,
-                                                                            background:
-                                                                                m.side ===
-                                                                                "other"
-                                                                                    ? "#4A90E2"
-                                                                                    : "#F0F0F0",
-                                                                            borderColor:
-                                                                                m.side ===
-                                                                                "other"
-                                                                                    ? "#4A90E2"
-                                                                                    : "rgba(0,0,0,0.10)",
-                                                                            color:
-                                                                                m.side ===
-                                                                                "other"
-                                                                                    ? "#FFFFFF"
-                                                                                    : "#333",
-                                                                        }}
+                                                                        key={
+                                                                            idx
+                                                                        }
+                                                                        style={
+                                                                            styles.systemMsg
+                                                                        }
                                                                     >
                                                                         {m.text}
-                                                                        {m.side ===
-                                                                            "other" && (
-                                                                            <button
-                                                                                style={
-                                                                                    styles.otherTag
-                                                                                }
-                                                                                onClick={() =>
-                                                                                    setSelectedUserId(
-                                                                                        m.authorUserId,
-                                                                                    )
-                                                                                }
-                                                                                title={`${m.authorName}さんを見る`}
-                                                                            >
-                                                                                {
-                                                                                    m.authorName
-                                                                                }
-                                                                            </button>
-                                                                        )}
                                                                     </div>
-                                                                </div>
-                                                            ),
+                                                                ) : (
+                                                                    <div
+                                                                        key={
+                                                                            idx
+                                                                        }
+                                                                        style={{
+                                                                            ...styles.msgRow,
+                                                                            justifyContent:
+                                                                                m.side ===
+                                                                                "other"
+                                                                                    ? "flex-end"
+                                                                                    : "flex-start",
+                                                                        }}
+                                                                    >
+                                                                        <div
+                                                                            style={{
+                                                                                ...styles.msgBubble,
+                                                                                background:
+                                                                                    m.side ===
+                                                                                    "other"
+                                                                                        ? "#4A90E2"
+                                                                                        : "#F0F0F0",
+                                                                                borderColor:
+                                                                                    m.side ===
+                                                                                    "other"
+                                                                                        ? "#4A90E2"
+                                                                                        : "rgba(0,0,0,0.10)",
+                                                                                color:
+                                                                                    m.side ===
+                                                                                    "other"
+                                                                                        ? "#FFFFFF"
+                                                                                        : "#333",
+                                                                            }}
+                                                                        >
+                                                                            {
+                                                                                m.text
+                                                                            }
+                                                                            {m.side ===
+                                                                                "other" && (
+                                                                                <button
+                                                                                    style={
+                                                                                        styles.otherTag
+                                                                                    }
+                                                                                    onClick={() =>
+                                                                                        setSelectedUserId(
+                                                                                            m.authorUserId,
+                                                                                        )
+                                                                                    }
+                                                                                    title={`${m.authorName}さんを見る`}
+                                                                                >
+                                                                                    {
+                                                                                        m.authorName
+                                                                                    }
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                ),
                                                         )
                                                     )}
                                                 </div>
