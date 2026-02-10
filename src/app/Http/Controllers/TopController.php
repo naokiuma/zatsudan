@@ -32,28 +32,33 @@ class TopController extends Controller
 		$startUtc = $targetDayJst->copy()->startOfDay()->utc();
 		$endUtc   = $targetDayJst->copy()->endOfDay()->utc();
 
-		$todayTheme = Theme::whereBetween('created_at', [$startUtc, $endUtc])
-			->latest('created_at')
-			->first();
+		// テーマ関連の残骸
+		// $todayTheme = Theme::whereBetween('created_at', [$startUtc, $endUtc])
+		// 	->latest('created_at')
+		// 	->first();
 
-		$comments = [];
-		if ($todayTheme) {
-			// var_dump('テーマID:' . $todayTheme->id);
-			// exit;
-			$comments = Comment::where('theme_id', $todayTheme->id)
-				->latest('created_at')
-				->get();
-		}
+		// $comments = [];
+		// if ($todayTheme) {
+		// 	// var_dump('テーマID:' . $todayTheme->id);
+		// 	// exit;
+		// 	$comments = Comment::where('theme_id', $todayTheme->id)
+		// 		->latest('created_at')
+		// 		->get();
+		// }
 		// var_dump(($comments)->toArray());
 
 		return Inertia::render('Top', [
-			'todayTheme' => $todayTheme,
-			'comments' => $comments,
+			// 'todayTheme' => $todayTheme,
+			// 'comments' => $comments,
 			'todayFormatted' => $todayFormatted,
 			'day' => $targetDayJst->format('Ymd'),
 		]);
 	}
 
+	public function canvas(Request $request)
+	{
+		return Inertia::render('Canvas', []);
+	}
 
 	// コメント保存
 	public function store(Request $request)

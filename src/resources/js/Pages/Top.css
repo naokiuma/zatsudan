@@ -1,0 +1,29 @@
+/* resources/js/Pages/Top.css */
+
+* {
+    box-sizing: border-box;
+}
+body {
+    margin: 0;
+}
+
+@keyframes floatBG {
+    0% {
+        filter: hue-rotate(0deg);
+    }
+    50% {
+        filter: hue-rotate(18deg);
+    }
+    100% {
+        filter: hue-rotate(0deg);
+    }
+}
+
+@keyframes marquee {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}
