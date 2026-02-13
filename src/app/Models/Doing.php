@@ -9,7 +9,7 @@ class Doing extends Model
 	protected $fillable = [
 		'user_id',
 		'room_id',
-		'doing_type_id',
+		'doing_type_key',
 		'day',
 		'started_at',
 		'ended_at',
@@ -34,11 +34,6 @@ class Doing extends Model
 	public function room()
 	{
 		return $this->belongsTo(Room::class);
-	}
-
-	public function doingType()
-	{
-		return $this->belongsTo(DoingType::class);
 	}
 
 	public function comments()

@@ -18,26 +18,6 @@ Laravelデフォルトのusersテーブルに以下のカラムを追加:
 - `current_room_id` — 現在いる部屋 (FK to rooms, nullable, nullOnDelete)
 - インデックス: `idx_users_presence` (presence_status, last_seen_at), `idx_users_current_room` (current_room_id)
 
-#### doing_types
-
-アクティビティタイプのマスタ（system / user スコープ）
-
-- `id` — 主キー
-- `scope` — スコープ (enum: system/user, default: system)
-- `owner_user_id` — オーナーユーザー (FK to users, nullable, nullOnDelete) ※ scope='user' の場合
-- `key` — 識別子 (varchar 64)
-- `label` — 表示名 (varchar 100)
-- `emoji` — 絵文字 (varchar 10, default: '')
-- `color` — 表示色 (varchar 20, default: '#9CA3AF')
-- `move_chance` — 移動確率 (decimal 3,2, default: 0) ※ フロント用
-- `move_distance` — 移動距離 (int, default: 0) ※ フロント用
-- `css_anim` — CSSアニメーション (varchar 100, default: 'none')
-- `is_active` — アクティブフラグ (boolean, default: true)
-- `sort_order` — ソート順 (int, default: 0)
-- `timestamps` — created_at / updated_at
-- ユニーク制約: `uq_doing_types_scope_owner_key` (scope, owner_user_id, key)
-- インデックス: `idx_doing_types_scope_owner` (scope, owner_user_id), `idx_doing_types_active_sort` (is_active, sort_order)
-
 #### doings
 
 ユーザーごとの日毎アクティビティ履歴（is_currentフラグはアプリ側で管理）
@@ -45,7 +25,7 @@ Laravelデフォルトのusersテーブルに以下のカラムを追加:
 - `id` — 主キー
 - `user_id` — ユーザー (FK to users, cascadeOnDelete)
 - `room_id` — 部屋 (FK to rooms, cascadeOnDelete)
-- `doing_type_id` — アクティビティタイプ (FK to doing_types, restrictOnDelete)
+- `doing_type_key` — アクティビティタイプキー (varchar 64) ※ config('doing_types') のキーに対応
 - `day` — 日付 (date) ※ JSTで切って保存想定
 - `started_at` — 開始日時 (datetime)
 - `ended_at` — 終了日時 (datetime, nullable)

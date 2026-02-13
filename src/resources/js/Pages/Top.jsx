@@ -498,9 +498,25 @@ export default function Top({
                 return [...tl, item].slice(-20);
             });
 
-            // サーバーに保存
+            // サーバーに保存 → レスポンスのDB IDで置き換え
             axios
                 .post("/api/doing/switch", { doing_type_key: doingKey })
+                .then((res) => {
+                    const dbId = res.data.id;
+                    const tempId = newUserDoing.id;
+                    setUserDoings((prev) =>
+                        prev.map((ud) =>
+                            ud.id === tempId ? { ...ud, id: `ud-${dbId}` } : ud,
+                        ),
+                    );
+                    setDoingMessages((prev) =>
+                        prev.map((m) =>
+                            m.user_doing_id === tempId
+                                ? { ...m, user_doing_id: `ud-${dbId}` }
+                                : m,
+                        ),
+                    );
+                })
                 .catch((err) => {
                     console.error("doing切替保存エラー:", err);
                 });
@@ -743,133 +759,129 @@ export default function Top({
     }, [propsTopics]);
 
     // -------------------------
-    // "賑やかさ"：他人だけ 2.5秒ごとに doing 更新（自分は触らない）
-    // 今は完全にプログラムで実装。いずれ人を実際に入れる。
+    // "賑やかさ"：他人だけ定期的に doing 更新（自分は触らない）
+    // TODO: 将来的には各ユーザーが自分で切り替える。フロント自動更新は不要になる。
     // -------------------------
-    useEffect(() => {
-        const t = setInterval(() => {
-            setUserDoings((prev) => {
-                const others = dbUsers.filter((u) => u.id !== currentUserId);
-                if (others.length === 0) return prev;
-                const who = pick(others);
-                const now = Date.now();
-
-                const currentKey = getCurrentDoingKey(who.id, prev, doingTypes);
-                const currentUd = getCurrentUserDoing(who.id, prev);
-                const activeDoings = dbDoings.filter((d) => d.key !== "idle");
-                if (activeDoings.length === 0) return prev;
-                const newDoing = pick(activeDoings).key;
-                if (newDoing === currentKey) return prev;
-
-                const newUserDoing = {
-                    id: `ud-${who.id}-${now}-${Math.random().toString(16).slice(2)}`,
-                    user_id: who.id,
-                    doing_key: newDoing,
-                    started_at: now,
-                };
-
-                // システムメッセージ + 本人の一言
-                setDoingMessages((msgs) => {
-                    const newMsgs = [];
-                    if (currentUd) {
-                        newMsgs.push({
-                            id: `sys-${currentUd.id}-end-${now}`,
-                            user_doing_id: currentUd.id,
-                            author_user_id: who.id,
-                            text: `${doingInfo(currentKey).label}を終了しました`,
-                            created_at: now,
-                            isSystem: true,
-                        });
-                    }
-                    newMsgs.push({
-                        id: `sys-${newUserDoing.id}-start-${now}`,
-                        user_doing_id: newUserDoing.id,
-                        author_user_id: who.id,
-                        text: `${doingInfo(newDoing).label}を開始しました`,
-                        created_at: now + 1,
-                        isSystem: true,
-                    });
-                    newMsgs.push({
-                        id: `m-${newUserDoing.id}-1`,
-                        user_doing_id: newUserDoing.id,
-                        author_user_id: who.id,
-                        text: "はじめよ〜",
-                        created_at: now + 2,
-                    });
-                    return [...msgs, ...newMsgs];
-                });
-
-                setTimeline((tl) => {
-                    const text = `${who.name}さんが ${doingInfo(newDoing).label} をしています`;
-                    const item = {
-                        id: `${who.id}-${now}-${Math.random()}`,
-                        text,
-                    };
-                    return [...tl, item].slice(-20);
-                });
-
-                return [newUserDoing, ...prev].slice(0, 300);
-            });
-        }, 2500);
-
-        return () => clearInterval(t);
-    }, [dbUsers, dbDoings, currentUserId, doingTypes]);
+    // useEffect(() => {
+    //     const t = setInterval(() => {
+    //         setUserDoings((prev) => {
+    //             const others = dbUsers.filter((u) => u.id !== currentUserId);
+    //             if (others.length === 0) return prev;
+    //             const who = pick(others);
+    //             const now = Date.now();
+    //
+    //             const currentKey = getCurrentDoingKey(who.id, prev, doingTypes);
+    //             const currentUd = getCurrentUserDoing(who.id, prev);
+    //             const activeDoings = dbDoings.filter((d) => d.key !== "idle");
+    //             if (activeDoings.length === 0) return prev;
+    //             const newDoing = pick(activeDoings).key;
+    //             if (newDoing === currentKey) return prev;
+    //
+    //             const newUserDoing = {
+    //                 id: `ud-${who.id}-${now}-${Math.random().toString(16).slice(2)}`,
+    //                 user_id: who.id,
+    //                 doing_key: newDoing,
+    //                 started_at: now,
+    //             };
+    //
+    //             setDoingMessages((msgs) => {
+    //                 const newMsgs = [];
+    //                 if (currentUd) {
+    //                     newMsgs.push({
+    //                         id: `sys-${currentUd.id}-end-${now}`,
+    //                         user_doing_id: currentUd.id,
+    //                         author_user_id: who.id,
+    //                         text: `${doingInfo(currentKey).label}を終了しました`,
+    //                         created_at: now,
+    //                         isSystem: true,
+    //                     });
+    //                 }
+    //                 newMsgs.push({
+    //                     id: `sys-${newUserDoing.id}-start-${now}`,
+    //                     user_doing_id: newUserDoing.id,
+    //                     author_user_id: who.id,
+    //                     text: `${doingInfo(newDoing).label}を開始しました`,
+    //                     created_at: now + 1,
+    //                     isSystem: true,
+    //                 });
+    //                 newMsgs.push({
+    //                     id: `m-${newUserDoing.id}-1`,
+    //                     user_doing_id: newUserDoing.id,
+    //                     author_user_id: who.id,
+    //                     text: "はじめよ〜",
+    //                     created_at: now + 2,
+    //                 });
+    //                 return [...msgs, ...newMsgs];
+    //             });
+    //
+    //             setTimeline((tl) => {
+    //                 const text = `${who.name}さんが ${doingInfo(newDoing).label} をしています`;
+    //                 const item = {
+    //                     id: `${who.id}-${now}-${Math.random()}`,
+    //                     text,
+    //                 };
+    //                 return [...tl, item].slice(-20);
+    //             });
+    //
+    //             return [newUserDoing, ...prev].slice(0, 300);
+    //         });
+    //     }, 2500);
+    //
+    //     return () => clearInterval(t);
+    // }, [dbUsers, dbDoings, currentUserId, doingTypes]);
 
     // -------------------------
     // 漂い（avatar_states更新）— doing別の動きプロファイルを適用
+    // TODO: 将来的にはクリックした場所に移動できるようにする。自動漂いは廃止。
     // -------------------------
-    const usersViewRef = useRef(usersView);
-    usersViewRef.current = usersView;
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setAvatarStates((prev) => {
-                const el = plazaRef.current;
-                if (!el) return prev;
-
-                const rect = el.getBoundingClientRect();
-                const minX = 28;
-                const minY = 28;
-                const maxX = Math.max(minX + 1, rect.width - 28);
-                const maxY = Math.max(minY + 1, rect.height - 28);
-
-                const currentUsersView = usersViewRef.current;
-
-                return prev.map((a) => {
-                    const uv = currentUsersView.find((u) => u.id === a.user_id);
-                    const di = uv
-                        ? doingInfo(uv.currentDoing)
-                        : (doingTypes[0] ?? {
-                              moveChance: 0,
-                              moveDistance: 0,
-                          });
-
-                    // doing別の移動確率と距離
-                    const moveChance = di.moveChance ?? 1.0;
-                    const moveDistance = di.moveDistance ?? 18;
-
-                    // 選択中のユーザーは動きを抑制
-                    const selectBias =
-                        a.user_id === selectedUserId ? 0.25 : 1.0;
-
-                    // 確率チェック: 動かない場合はそのまま返す
-                    if (Math.random() > moveChance) return a;
-
-                    const dx =
-                        (Math.random() - 0.5) * moveDistance * selectBias;
-                    const dy =
-                        (Math.random() - 0.5) * moveDistance * selectBias;
-                    return {
-                        ...a,
-                        x: clamp(a.x + dx, minX, maxX),
-                        y: clamp(a.y + dy, minY, maxY),
-                    };
-                });
-            });
-        }, 1000);
-
-        return () => clearInterval(interval);
-    }, [selectedUserId, doingTypes]);
+    // const usersViewRef = useRef(usersView);
+    // usersViewRef.current = usersView;
+    //
+    // useEffect(() => {
+    //     const interval = setInterval(() => {
+    //         setAvatarStates((prev) => {
+    //             const el = plazaRef.current;
+    //             if (!el) return prev;
+    //
+    //             const rect = el.getBoundingClientRect();
+    //             const minX = 28;
+    //             const minY = 28;
+    //             const maxX = Math.max(minX + 1, rect.width - 28);
+    //             const maxY = Math.max(minY + 1, rect.height - 28);
+    //
+    //             const currentUsersView = usersViewRef.current;
+    //
+    //             return prev.map((a) => {
+    //                 const uv = currentUsersView.find((u) => u.id === a.user_id);
+    //                 const di = uv
+    //                     ? doingInfo(uv.currentDoing)
+    //                     : (doingTypes[0] ?? {
+    //                           moveChance: 0,
+    //                           moveDistance: 0,
+    //                       });
+    //
+    //                 const moveChance = di.moveChance ?? 1.0;
+    //                 const moveDistance = di.moveDistance ?? 18;
+    //                 const selectBias =
+    //                     a.user_id === selectedUserId ? 0.25 : 1.0;
+    //
+    //                 if (Math.random() > moveChance) return a;
+    //
+    //                 const dx =
+    //                     (Math.random() - 0.5) * moveDistance * selectBias;
+    //                 const dy =
+    //                     (Math.random() - 0.5) * moveDistance * selectBias;
+    //                 return {
+    //                     ...a,
+    //                     x: clamp(a.x + dx, minX, maxX),
+    //                     y: clamp(a.y + dy, minY, maxY),
+    //                 };
+    //             });
+    //         });
+    //     }, 1000);
+    //
+    //     return () => clearInterval(interval);
+    // }, [selectedUserId, doingTypes]);
 
     return (
         <div className="top_page_section page_section">

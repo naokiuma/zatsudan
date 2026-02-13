@@ -560,6 +560,7 @@ input[type="range"].top_drawer_radio_onoff_btn:checked
     inset: 0;
     padding: 10px;
     overflow: auto;
+    background-color: #f3f5fa;
 }
 .top_my_controls {
     border-radius: 14px;

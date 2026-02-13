@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Room;
-use App\Models\DoingType;
 use App\Models\Doing;
 use App\Models\Topic;
 use App\Models\Comment;
@@ -24,10 +23,11 @@ class TopController extends Controller
 	private function getCurrentUserId(): ?int
 	{
 		// パターンA: user1固定（MVP用 - ログインなしでもコメント可能）
-		// return Auth::id() ?? 1;
+		return Auth::id() ?? 2;
+		//各ユーザーの作業は1日おごとに異なる。各ユーザーが自分でdoingを切り替えれば正しく反映されます。
 
 		// パターンB: ゲストモード（開発中の動作確認用 - ログインなしはコメント不可）
-		return Auth::id();
+		// return Auth::id();
 	}
 
 	public function index(Request $request)
@@ -45,20 +45,17 @@ class TopController extends Controller
 
 		$room = Room::where('slug', 'main')->where('is_active', true)->first();
 
-		// doing_types (system) 
-		// todo 将来的にsystemではないdoingも作成する
-		$doingTypes = DoingType::where('scope', 'system')
-			->where('is_active', true)
-			->orderBy('sort_order')
-			->get()
+		// doing_types (config)
+		$doingTypes = collect(config('doing_types'))
+			->sortBy('sort_order')
 			->map(fn($dt) => [
-				'key' => $dt->key,
-				'label' => $dt->label,
-				'emoji' => $dt->emoji,
-				'color' => $dt->color,
-				'moveChance' => (float) $dt->move_chance,
-				'moveDistance' => (int) $dt->move_distance,
-				'cssAnim' => $dt->css_anim,
+				'key' => $dt['key'],
+				'label' => $dt['label'],
+				'emoji' => $dt['emoji'],
+				'color' => $dt['color'],
+				'moveChance' => (float) $dt['move_chance'],
+				'moveDistance' => (int) $dt['move_distance'],
+				'cssAnim' => $dt['css_anim'],
 			])
 			->values();
 
@@ -93,13 +90,12 @@ class TopController extends Controller
 		$doings = $room
 			? Doing::where('room_id', $room->id)
 			->where('day', $today)
-			->with('doingType')
 			->orderBy('started_at', 'desc')
 			->get()
 			->map(fn($d) => [
 				'id' => $d->id,
 				'user_id' => $d->user_id,
-				'doing_key' => $d->doingType->key,
+				'doing_key' => $d->doing_type_key,
 				'started_at' => $d->started_at->getTimestampMs(),
 				'is_current' => $d->is_current,
 			])
@@ -170,10 +166,9 @@ class TopController extends Controller
 		$room = Room::where('slug', 'main')->where('is_active', true)->firstOrFail();
 		$today = Carbon::now('Asia/Tokyo')->toDateString();
 
-		$doingType = DoingType::where('key', $data['doing_type_key'])
-			->where('scope', 'system')
-			->where('is_active', true)
-			->firstOrFail();
+		$key = $data['doing_type_key'];
+		$doingType = config("doing_types.{$key}");
+		abort_unless($doingType, 404, 'Unknown doing type');
 
 		// 現在の doing を終了
 		Doing::where('user_id', $userId)
@@ -189,7 +184,7 @@ class TopController extends Controller
 		$doing = Doing::create([
 			'user_id' => $userId,
 			'room_id' => $room->id,
-			'doing_type_id' => $doingType->id,
+			'doing_type_key' => $key,
 			'day' => $today,
 			'started_at' => Carbon::now(),
 			'is_current' => true,
@@ -198,7 +193,7 @@ class TopController extends Controller
 		return response()->json([
 			'id' => $doing->id,
 			'user_id' => $doing->user_id,
-			'doing_key' => $doingType->key,
+			'doing_key' => $key,
 			'started_at' => $doing->started_at->getTimestampMs(),
 			'is_current' => true,
 		]);

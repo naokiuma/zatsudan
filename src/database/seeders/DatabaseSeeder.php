@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use App\Models\Room;
-use App\Models\DoingType;
 use App\Models\Doing;
 use Carbon\Carbon;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -37,22 +36,17 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // 3. doing_types
-        $this->call(DoingTypeSeeder::class);
-
-        // 4. 各ユーザーに初期 doing を割り当て
+        // 3. 各ユーザーに初期 doing を割り当て
         $users = User::all();
-        $doingTypes = DoingType::where('scope', 'system')
-            ->where('key', '!=', 'idle')
-            ->get();
+        $doingTypeKeys = collect(config('doing_types'))->keys()->reject('idle');
         $today = Carbon::now('Asia/Tokyo')->toDateString();
 
         foreach ($users as $user) {
-            $type = $doingTypes->random();
+            $key = $doingTypeKeys->random();
             Doing::create([
                 'user_id' => $user->id,
                 'room_id' => $room->id,
-                'doing_type_id' => $type->id,
+                'doing_type_key' => $key,
                 'day' => $today,
                 'started_at' => Carbon::now()->subMinutes(rand(5, 60)),
                 'is_current' => true,
