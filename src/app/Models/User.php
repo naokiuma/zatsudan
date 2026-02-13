@@ -21,6 +21,9 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'presence_status',
+        'last_seen_at',
+        'current_room_id',
     ];
 
     /**
@@ -43,6 +46,22 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'last_seen_at' => 'datetime',
         ];
+    }
+
+    public function currentRoom()
+    {
+        return $this->belongsTo(Room::class, 'current_room_id');
+    }
+
+    public function doings()
+    {
+        return $this->hasMany(Doing::class);
+    }
+
+    public function comments()
+    {
+        return $this->hasMany(Comment::class);
     }
 }

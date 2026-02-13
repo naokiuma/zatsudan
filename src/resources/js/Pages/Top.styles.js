@@ -1,5 +1,3 @@
-// resources/js/Pages/Top.styles.js
-
 // 背景グラデ
 export const BG_GRADIENT =
     "radial-gradient(1200px 800px at 20% 10%, rgba(59,130,246,0.04), transparent 60%)," +

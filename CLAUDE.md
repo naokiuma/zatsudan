@@ -23,11 +23,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 全サービスはDocker Composeで動作。Laravelのソースは `src/` に配置。
 
 ### 起動方法
+
 ```bash
 docker compose up -d --build
 ```
 
 ### 初回セットアップ
+
 ```bash
 docker compose exec app php artisan key:generate
 docker compose exec app php artisan migrate
@@ -35,10 +37,12 @@ docker compose exec node npm install
 ```
 
 ### アクセス先
+
 - アプリ: http://localhost:8080/
 - Vite HMR: http://localhost:5173/
 
 ### よく使うコマンド
+
 ```bash
 # マイグレーション実行
 docker compose exec app php artisan migrate
@@ -64,42 +68,16 @@ docker compose exec node npm run dev
 
 ## アーキテクチャ
 
-### バックエンド (src/app/)
-
-LaravelがInertia.js経由でSSRレイヤーとして機能。APIエンドポイントは分離せず、コントローラーから `Inertia::render()` でReactページコンポーネントにデータを渡す。
-
-主要コントローラー:
-- `TopController` — メインページ (`/`)、キャンバスページ (`/canvas`)、コメント保存
-- `StaticController` — 静的ページ (about)
-- `ProfileController` — ユーザープロフィールCRUD（認証必須）
-
-主要モデル:
-- `Theme` — 日毎のディスカッションテーマ
-- `Comment` — テーマへのコメント
-- `User` — 認証 + プレゼンス管理 (presence_status, last_seen_at)
-
-### フロントエンド (src/resources/js/)
-
-Reactページは `Pages/` に配置し、Inertia経由でレンダリング。`@` エイリアスで `resources/js/` を参照可能（jsconfig.json と vite.config.js で設定済み）。
-
-- `Top.jsx` — メインページ: アクティビティ追跡、ディスカッション、日付ナビゲーション
-- `Canvas.jsx` — 描画/キャンバスページ
-- `Components/DoingSidebar.jsx` — アクティビティタイプのサイドバー
-
-スタイリングはTailwindユーティリティクラスと、コンポーネントに対応するCSSファイル（`Top.css`, `DoingSidebar.css`）を併用。
+`docs/02_architecture.md` を参照。
 
 ### データベース設計
 
-詳細は `docs/db.md` を参照。主要テーブル:
-- `doing_types` — アクティビティタイプのマスタ（system / user スコープ）
-- `doings` — ユーザーごとの日毎アクティビティ履歴（is_currentフラグはアプリ側で管理）
-- `topics` — 時間帯付きのディスカッショントピック（starts_at / ends_at, is_active）
-- `topic_comments` — コメントとトピックの中間テーブル
-- `topic_requests` — ユーザー提案のトピック（承認ワークフロー付き）
+`docs/03_database.md` を参照。
 
 ### Dockerサービス構成
 
 共有ブリッジネットワーク (`znet`) 上の5コンテナ:
+
 - `app` — PHP 8.3 FPM (Laravel)
 - `nginx` — リバースプロキシ (ポート 8080)
 - `node` — Vite開発サーバー (ポート 5173)

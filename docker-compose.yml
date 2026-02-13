@@ -27,11 +27,14 @@ services:
       - znet
 
   node:
+    init: true
+    stop_grace_period: 5s
     image: node:20-alpine
     working_dir: /var/www/html
     volumes:
       - ./src:/var/www/html
-    command: sh -lc "npm install && npm run dev -- --host 0.0.0.0 --port ${VITE_PORT:-5173}"
+      - node_modules:/var/www/html/node_modules
+    command: sh -lc "npm run dev -- --host 0.0.0.0 --port ${VITE_PORT:-5173}"
     ports:
       - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     networks:
@@ -50,7 +53,15 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD:-secret}"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-p${DB_PASSWORD:-secret}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -73,3 +84,4 @@ networks:
 volumes:
   mysql-data:
   redis-data:
+  node_modules:

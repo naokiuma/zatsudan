@@ -2,15 +2,18 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
 	public function up(): void
 	{
-		// ① 既にあったら削除（なければ何もしない）
+		// FK制約を一時的に無効にしてdrop
+		DB::statement('SET FOREIGN_KEY_CHECKS=0');
 		Schema::dropIfExists('comments');
+		DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
-		// ② 新しい定義で作り直す
+		// 新しい定義で作り直す
 		Schema::create('comments', function (Blueprint $table) {
 			$table->id();
 

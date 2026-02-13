@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-
+import { styles } from "./Top.styles";
 import "./Top.css";
 import axios from "axios";
 
@@ -872,19 +872,65 @@ export default function Top({
     }, [selectedUserId, doingTypes]);
 
     return (
-        <div className="top_page_section page_section">
+        <div className="page_section" style={styles.page}>
             {/* Topic overlay */}
             {topicOverlay && (
-                <div className="top_topic_overlay_wrap topic_overlay_wrap">
-                    <div className="top_topic_overlay topic_overlay">
-                        <div className="top_topic_overlay_title topic_overlay_title">
+                <div
+                    className="topic_overlay_wrap"
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        pointerEvents: "none",
+                        zIndex: 9999,
+                    }}
+                >
+                    <div
+                        className="topic_overlay"
+                        style={{
+                            padding: "14px 16px",
+                            borderRadius: 16,
+                            background: "rgba(255,255,255,0.92)",
+                            border: "1px solid rgba(0,0,0,0.10)",
+                            boxShadow: "0 18px 40px rgba(0,0,0,0.12)",
+                            backdropFilter: "blur(10px)",
+                            maxWidth: 520,
+                            width: "min(520px, calc(100vw - 48px))",
+                            transform: "translateY(-10px)",
+                            animation: "topic-pop 3.8s ease-in-out forwards",
+                        }}
+                    >
+                        <div
+                            className="topic_overlay_title"
+                            style={{
+                                fontSize: 12,
+                                opacity: 0.7,
+                                fontWeight: 800,
+                            }}
+                        >
                             🔔 今日のテーマ
                         </div>
-                        <div className="top_topic_overlay_title2 topic_overlay_title">
+                        <div
+                            className="topic_overlay_title"
+                            style={{
+                                fontSize: 18,
+                                fontWeight: 900,
+                                marginTop: 6,
+                            }}
+                        >
                             {topicOverlay.title}
                         </div>
                         {topicOverlay.desc ? (
-                            <div className="top_topic_overlay_desc topic_overlay_desc">
+                            <div
+                                className="topic_overlay_desc"
+                                style={{
+                                    fontSize: 13,
+                                    opacity: 0.8,
+                                    marginTop: 6,
+                                }}
+                            >
                                 {topicOverlay.desc}
                             </div>
                         ) : null}
@@ -893,17 +939,17 @@ export default function Top({
             )}
 
             {/* Top bar */}
-            <div className="top_topbar">
-                <div className="top_brand">
-                    <div className="top_brand_title">zatsudan</div>
-                    <div className="top_brand_sub">
+            <div style={styles.topbar}>
+                <div style={styles.brand}>
+                    <div style={styles.brandTitle}>zatsudan</div>
+                    <div style={styles.brandSub}>
                         いるだけ広場（MVP / 自分操作あり）
                     </div>
                 </div>
 
-                <div className="top_topbar_btns">
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <button
-                        className="top_my_btn"
+                        style={styles.myBtn}
                         onClick={openMyPanel}
                         title="自分を開く"
                     >
@@ -913,10 +959,10 @@ export default function Top({
             </div>
 
             {/* Main */}
-            <div className="top_main">
+            <div style={styles.main}>
                 {/* Plaza */}
-                <div ref={plazaRef} className="top_plaza">
-                    <div className="top_plaza_bg" />
+                <div ref={plazaRef} style={styles.plaza}>
+                    <div style={styles.bgLayer} />
 
                     {/* dots */}
                     {usersView.map((u) => {
@@ -926,20 +972,35 @@ export default function Top({
                         return (
                             <button
                                 key={u.id}
-                                className={`top_plaza_dot_btn${isSelected ? " top_plaza_dot_btn--selected" : ""}`}
                                 onClick={() => onClickDot(u.id)}
                                 title={`${u.name} / ${d.label}`}
-                                style={{ left: u.pos.x, top: u.pos.y }}
+                                style={{
+                                    ...styles.dot,
+                                    left: u.pos.x,
+                                    top: u.pos.y,
+                                    transform: isSelected
+                                        ? "scale(1.4)"
+                                        : "scale(1)",
+                                    borderColor: isSelected
+                                        ? "rgba(0,0,0,0.3)"
+                                        : "rgba(0,0,0,0.15)",
+                                    boxShadow: isSelected
+                                        ? `0 0 0 6px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.15)`
+                                        : "0 2px 8px rgba(0,0,0,0.1)",
+                                }}
                             >
                                 <span
-                                    className="top_plaza_dot_core"
                                     style={{
+                                        ...styles.dotCore,
                                         backgroundImage:
                                             'url("/images/avatar/test.png")',
+                                        backgroundSize: "cover",
+                                        backgroundPosition: "center",
+                                        backgroundRepeat: "no-repeat",
                                         animation: d.cssAnim || "none",
                                     }}
                                 />
-                                <span className="top_plaza_dot_label">
+                                <span style={styles.dotLabel}>
                                     {d.emoji ? `${d.emoji} ` : ""}
                                     {u.name}
                                 </span>
@@ -949,16 +1010,16 @@ export default function Top({
                 </div>
 
                 {/* Right drawer (右サイド：ここに統一) */}
-                <div className="top_drawer">
+                <div style={styles.drawer}>
                     {/* ヘッダー */}
-                    <div className="top_drawer_header">
+                    <div style={styles.drawerHeader}>
                         {selectedUser ? (
-                            <div className="top_drawer_header_row">
-                                <div className="top_drawer_header_name">
+                            <div style={styles.drawerHeaderRow}>
+                                <div style={{ fontWeight: 900 }}>
                                     {selectedUser.name}
                                 </div>
                                 <button
-                                    className="top_drawer_close_btn"
+                                    style={styles.closeBtn}
                                     onClick={() => setSelectedUserId(null)}
                                     title="閉じる"
                                 >
@@ -966,39 +1027,77 @@ export default function Top({
                                 </button>
                             </div>
                         ) : (
-                            <div className="top_drawer_header_title">
-                                みんなたち
-                            </div>
+                            <div style={{ fontWeight: 900 }}>みんなたち</div>
                         )}
                     </div>
 
                     {/* 中身 */}
-                    <div className="top_drawer_body">
+                    <div style={styles.drawerBody}>
                         {/* ===== Topic + Radio (always visible) ===== */}
-                        <div className="top_drawer_topic_radio">
+                        <div style={{ marginBottom: 12 }}>
                             {/* Radio mini */}
-                            <div className="top_drawer_radio_mini">
-                                <div className="top_drawer_radio_info">
-                                    <div className="top_drawer_radio_label">
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: 10,
+                                    padding: "10px 12px",
+                                    borderRadius: 12,
+                                    background: "rgba(255,255,255,0.85)",
+                                    border: "1px solid rgba(0,0,0,0.08)",
+                                    marginBottom: 10,
+                                }}
+                            >
+                                <div style={{ minWidth: 0 }}>
+                                    <div
+                                        style={{
+                                            fontSize: 12,
+                                            opacity: 0.7,
+                                            fontWeight: 900,
+                                        }}
+                                    >
                                         📻 Radio
                                     </div>
-                                    <div className="top_drawer_radio_track">
+                                    <div
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: 900,
+                                            whiteSpace: "nowrap",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                        }}
+                                    >
                                         ♪ {radioTrack.title} —{" "}
                                         {radioTrack.artist}
                                     </div>
                                 </div>
 
-                                <div className="top_drawer_radio_ctrls">
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 10,
+                                    }}
+                                >
                                     <button
-                                        className={`top_drawer_radio_onoff_btn${radioOn ? " top_drawer_radio_onoff_btn--on" : ""}`}
                                         onClick={() => setRadioOn((v) => !v)}
+                                        style={{
+                                            padding: "8px 10px",
+                                            borderRadius: 10,
+                                            border: "1px solid rgba(0,0,0,0.10)",
+                                            background: radioOn
+                                                ? "rgba(0,0,0,0.06)"
+                                                : "#fff",
+                                            fontWeight: 900,
+                                            cursor: "pointer",
+                                        }}
                                         title="（mock）いまは音は鳴らさずUIだけ"
                                     >
                                         {radioOn ? "ON" : "OFF"}
                                     </button>
 
                                     <input
-                                        className="top_drawer_radio_volume"
                                         type="range"
                                         min="0"
                                         max="1"
@@ -1009,32 +1108,75 @@ export default function Top({
                                                 Number(e.target.value),
                                             )
                                         }
+                                        style={{ width: 80 }}
                                         title={`Volume: ${Math.round(radioVolume * 100)}%`}
                                     />
                                 </div>
                             </div>
 
-                            {/* Topic button */}
+                            {/* Topic card */}
                             <button
-                                className="top_drawer_topic_btn"
                                 onClick={() => setIsTopicPanelOpen((v) => !v)}
+                                style={{
+                                    width: "100%",
+                                    textAlign: "left",
+                                    padding: "10px 12px",
+                                    borderRadius: 12,
+                                    background: "rgba(255,255,255,0.85)",
+                                    border: "1px solid rgba(0,0,0,0.08)",
+                                    cursor: "pointer",
+                                }}
+                                title="クリックでテーマのコメント欄を開く"
                             >
-                                <div className="top_drawer_topic_btn_row">
-                                    <div className="top_drawer_topic_info">
-                                        <div className="top_drawer_topic_label">
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        gap: 10,
+                                    }}
+                                >
+                                    <div style={{ minWidth: 0 }}>
+                                        <div
+                                            style={{
+                                                fontSize: 12,
+                                                opacity: 0.7,
+                                                fontWeight: 900,
+                                            }}
+                                        >
                                             🔔 今のテーマ
                                         </div>
-                                        <div className="top_drawer_topic_title">
+                                        <div
+                                            style={{
+                                                fontSize: 13,
+                                                fontWeight: 900,
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                            }}
+                                        >
                                             {currentTopic.title}
                                         </div>
                                     </div>
-                                    <div className="top_drawer_topic_arrow">
+                                    <div
+                                        style={{
+                                            fontSize: 12,
+                                            opacity: 0.65,
+                                            fontWeight: 900,
+                                        }}
+                                    >
                                         {isTopicPanelOpen ? "▲" : "▼"}
                                     </div>
                                 </div>
 
                                 {currentTopic.desc ? (
-                                    <div className="top_drawer_topic_desc">
+                                    <div
+                                        style={{
+                                            marginTop: 6,
+                                            fontSize: 12,
+                                            opacity: 0.75,
+                                        }}
+                                    >
                                         {currentTopic.desc}
                                     </div>
                                 ) : null}
@@ -1042,32 +1184,103 @@ export default function Top({
 
                             {/* Topic panel */}
                             {isTopicPanelOpen && (
-                                <div className="top_drawer_topic_panel">
-                                    <div className="top_drawer_topic_panel_label">
+                                <div
+                                    style={{
+                                        marginTop: 10,
+                                        padding: "10px 12px",
+                                        borderRadius: 12,
+                                        background: "rgba(255,255,255,0.78)",
+                                        border: "1px solid rgba(0,0,0,0.08)",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: 900,
+                                            opacity: 0.8,
+                                            marginBottom: 8,
+                                        }}
+                                    >
                                         💬 テーマへのコメント
                                     </div>
 
                                     {/* コメント一覧（doingの見た目を流用） */}
-                                    <div className="top_drawer_topic_panel_comments">
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: 8,
+                                            maxHeight: 220,
+                                            overflow: "auto",
+                                            paddingRight: 4,
+                                        }}
+                                    >
                                         {currentTopicComments.length === 0 ? (
-                                            <div className="top_drawer_topic_panel_no_comment">
+                                            <div
+                                                style={{
+                                                    fontSize: 12,
+                                                    opacity: 0.6,
+                                                }}
+                                            >
                                                 （まだコメントなし）
                                             </div>
                                         ) : (
                                             currentTopicComments.map((m) => (
                                                 <div
                                                     key={m.id}
-                                                    className={`top_drawer_topic_panel_comment_row${m.authorUserId === currentUserId ? " top_drawer_topic_panel_comment_row--right" : ""}`}
+                                                    style={{
+                                                        display: "flex",
+                                                        justifyContent:
+                                                            m.authorUserId ===
+                                                            currentUserId
+                                                                ? "flex-end"
+                                                                : "flex-start",
+                                                    }}
                                                 >
                                                     <div
-                                                        className={`top_drawer_topic_panel_comment_bubble${m.authorUserId === currentUserId ? " top_drawer_topic_panel_comment_bubble--right" : ""}`}
+                                                        style={{
+                                                            padding: "8px 10px",
+                                                            borderRadius: 12,
+                                                            border: "1px solid rgba(0,0,0,0.10)",
+                                                            background:
+                                                                m.authorUserId ===
+                                                                currentUserId
+                                                                    ? "#4A90E2"
+                                                                    : "#F0F0F0",
+                                                            color:
+                                                                m.authorUserId ===
+                                                                currentUserId
+                                                                    ? "#fff"
+                                                                    : "#333",
+                                                            maxWidth: "90%",
+                                                            fontSize: 13,
+                                                            lineHeight: 1.35,
+                                                            position:
+                                                                "relative",
+                                                        }}
                                                         title={m.authorName}
                                                     >
                                                         {m.text}
                                                         {m.authorUserId !==
                                                             currentUserId && (
                                                             <button
-                                                                className="top_drawer_topic_panel_comment_user_btn"
+                                                                style={{
+                                                                    marginLeft: 10,
+                                                                    padding:
+                                                                        "2px 8px",
+                                                                    borderRadius: 999,
+                                                                    border: "1px solid rgba(0,0,0,0.10)",
+                                                                    background:
+                                                                        "rgba(255,255,255,0.35)",
+                                                                    color:
+                                                                        m.authorUserId ===
+                                                                        currentUserId
+                                                                            ? "#fff"
+                                                                            : "#333",
+                                                                    fontSize: 11,
+                                                                    fontWeight: 900,
+                                                                    cursor: "pointer",
+                                                                }}
                                                                 onClick={() =>
                                                                     setSelectedUserId(
                                                                         m.authorUserId,
@@ -1086,9 +1299,15 @@ export default function Top({
 
                                     {/* 入力欄 */}
                                     {currentUserId ? (
-                                        <div className="top_drawer_topic_panel_input_row">
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                gap: 8,
+                                                marginTop: 10,
+                                                alignItems: "stretch",
+                                            }}
+                                        >
                                             <textarea
-                                                className="top_drawer_topic_panel_input"
                                                 value={topicComment}
                                                 onChange={(e) =>
                                                     setTopicComment(
@@ -1099,17 +1318,41 @@ export default function Top({
                                                     onTopicCommentKeyDown
                                                 }
                                                 placeholder="テーマにひとこと（Enterで送信 / Shift+Enterで改行）"
+                                                style={{
+                                                    flex: 1,
+                                                    resize: "none",
+                                                    borderRadius: 12,
+                                                    border: "1px solid rgba(0,0,0,0.10)",
+                                                    padding: "8px 10px",
+                                                    fontSize: 13,
+                                                    outline: "none",
+                                                    background: "#fff",
+                                                }}
                                                 rows={2}
                                             />
                                             <button
-                                                className="top_drawer_topic_panel_send_btn"
                                                 onClick={submitTopicComment}
+                                                style={{
+                                                    padding: "8px 12px",
+                                                    borderRadius: 12,
+                                                    border: "1px solid rgba(0,0,0,0.10)",
+                                                    background: "#fff",
+                                                    fontWeight: 900,
+                                                    cursor: "pointer",
+                                                    whiteSpace: "nowrap",
+                                                }}
                                             >
                                                 送信
                                             </button>
                                         </div>
                                     ) : (
-                                        <div className="top_drawer_topic_panel_login_msg">
+                                        <div
+                                            style={{
+                                                fontSize: 12,
+                                                opacity: 0.6,
+                                                marginTop: 10,
+                                            }}
+                                        >
                                             コメントするにはログインしてください
                                         </div>
                                     )}
@@ -1118,15 +1361,21 @@ export default function Top({
                         </div>
 
                         {selectedUser ? (
-                            <div className="top_drawer_detail_overlay">
+                            <div style={styles.drawerDetailOverlay}>
                                 {/* 自分操作 */}
                                 {isSelectedMe && (
-                                    <div className="top_my_controls">
-                                        <div className="top_my_controls_label">
+                                    <div style={styles.myControls}>
+                                        <div
+                                            style={{
+                                                fontWeight: 900,
+                                                fontSize: 12,
+                                                opacity: 0.85,
+                                            }}
+                                        >
                                             Doing切り替え
                                         </div>
 
-                                        <div className="top_my_doing_grid">
+                                        <div style={styles.myDoingGrid}>
                                             {dbDoings
                                                 .filter((d) => d.key !== "idle")
                                                 .map((d) => {
@@ -1136,41 +1385,79 @@ export default function Top({
                                                     return (
                                                         <button
                                                             key={d.key}
-                                                            className={`top_my_doing_chip${active ? " top_my_doing_chip--active" : ""}`}
                                                             onClick={() =>
                                                                 setMyDoing(
                                                                     d.key,
                                                                 )
                                                             }
+                                                            style={{
+                                                                ...styles.doingChip,
+                                                                borderColor:
+                                                                    active
+                                                                        ? "rgba(0,0,0,0.22)"
+                                                                        : "rgba(0,0,0,0.10)",
+                                                                background:
+                                                                    active
+                                                                        ? "rgba(0,0,0,0.04)"
+                                                                        : "#FFFFFF",
+                                                            }}
                                                             title={d.label}
                                                         >
-                                                            {d.emoji} {d.label}
+                                                            <span
+                                                                style={{
+                                                                    marginRight: 8,
+                                                                }}
+                                                            >
+                                                                {d.emoji}
+                                                            </span>
+                                                            <span
+                                                                style={{
+                                                                    fontWeight: 900,
+                                                                }}
+                                                            >
+                                                                {d.label}
+                                                            </span>
                                                         </button>
                                                     );
                                                 })}
                                         </div>
 
                                         <button
-                                            className="top_my_doing_stop_btn"
                                             onClick={() => setMyDoing("idle")}
-                                            title="Doingを終了する"
+                                            disabled={
+                                                selectedUser.currentDoing ===
+                                                "idle"
+                                            }
+                                            style={{
+                                                ...styles.stopBtn,
+                                                opacity:
+                                                    selectedUser.currentDoing ===
+                                                    "idle"
+                                                        ? 0.4
+                                                        : 1,
+                                                cursor:
+                                                    selectedUser.currentDoing ===
+                                                    "idle"
+                                                        ? "default"
+                                                        : "pointer",
+                                            }}
                                         >
                                             終了する
                                         </button>
 
-                                        <div className="top_my_comment_row">
+                                        <div style={styles.myCommentRow}>
                                             <textarea
-                                                className="top_my_comment_input"
                                                 value={myComment}
                                                 onChange={(e) =>
                                                     setMyComment(e.target.value)
                                                 }
                                                 onKeyDown={onMyCommentKeyDown}
                                                 placeholder="いまのdoingにコメント（Enterで送信 / Shift+Enterで改行）"
+                                                style={styles.myTextarea}
                                                 rows={2}
                                             />
                                             <button
-                                                className="top_my_comment_send_btn"
+                                                style={styles.sendBtn}
                                                 onClick={submitMyComment}
                                             >
                                                 送信
@@ -1181,9 +1468,8 @@ export default function Top({
 
                                 {/* 他人にコメント */}
                                 {!isSelectedMe && currentUserId && (
-                                    <div className="top_other_comment_controls">
+                                    <div style={styles.myControls}>
                                         <div
-                                            className="top_other_comment_label"
                                             style={{
                                                 fontWeight: 900,
                                                 fontSize: 12,
@@ -1204,9 +1490,8 @@ export default function Top({
                                             })()}
                                         </div>
 
-                                        <div className="top_other_comment_row">
+                                        <div style={styles.myCommentRow}>
                                             <textarea
-                                                className="top_other_comment_input"
                                                 value={otherComment}
                                                 onChange={(e) =>
                                                     setOtherComment(
@@ -1217,10 +1502,11 @@ export default function Top({
                                                     onOtherCommentKeyDown
                                                 }
                                                 placeholder="Enterで送信 / Shift+Enterで改行"
+                                                style={styles.myTextarea}
                                                 rows={2}
                                             />
                                             <button
-                                                className="top_other_comment_send_btn"
+                                                style={styles.sendBtn}
                                                 onClick={
                                                     submitCommentToOtherUser
                                                 }
@@ -1232,18 +1518,25 @@ export default function Top({
                                 )}
 
                                 {/* logs */}
-                                <div className="top_drawer_logs">
+                                <div style={styles.logs}>
                                     {selectedUser.logs.map((log, logIdx) => {
                                         const di = doingInfo(log.doingKey);
                                         const isCurrent = logIdx === 0;
                                         return (
                                             <div
                                                 key={log.doingKey}
-                                                className="top_drawer_log_block"
+                                                style={{
+                                                    ...styles.logBlock,
+                                                    ...(isCurrent
+                                                        ? {
+                                                              borderLeft:
+                                                                  "3px solid #3B82F6",
+                                                          }
+                                                        : { opacity: 0.5 }),
+                                                }}
                                             >
-                                                <div className="top_drawer_log_heading">
+                                                <div style={styles.logHeading}>
                                                     <span
-                                                        className="top_drawer_log_emoji"
                                                         style={{
                                                             marginRight: 8,
                                                         }}
@@ -1251,24 +1544,29 @@ export default function Top({
                                                         {di.emoji}
                                                     </span>
                                                     <span
-                                                        className="top_drawer_log_label"
                                                         style={{
                                                             fontWeight: 800,
                                                         }}
                                                     >
                                                         {di.label}
                                                     </span>
-                                                    <span className="top_drawer_log_time">
+                                                    <span
+                                                        style={styles.logTime}
+                                                    >
                                                         {formatDoingStartTime(
                                                             log.startedAt,
                                                         )}
                                                     </span>
                                                 </div>
 
-                                                <div className="top_drawer_log_msg_list">
+                                                <div style={styles.msgList}>
                                                     {log.messages.length ===
                                                     0 ? (
-                                                        <div className="top_drawer_log_msg_hint">
+                                                        <div
+                                                            style={
+                                                                styles.msgHint
+                                                            }
+                                                        >
                                                             （まだコメントなし）
                                                         </div>
                                                     ) : (
@@ -1279,7 +1577,9 @@ export default function Top({
                                                                         key={
                                                                             idx
                                                                         }
-                                                                        className="top_drawer_log_system_msg"
+                                                                        style={
+                                                                            styles.systemMsg
+                                                                        }
                                                                     >
                                                                         {m.text}
                                                                     </div>
@@ -1288,16 +1588,44 @@ export default function Top({
                                                                         key={
                                                                             idx
                                                                         }
-                                                                        className="top_drawer_log_msg_row"
+                                                                        style={{
+                                                                            ...styles.msgRow,
+                                                                            justifyContent:
+                                                                                m.side ===
+                                                                                "other"
+                                                                                    ? "flex-end"
+                                                                                    : "flex-start",
+                                                                        }}
                                                                     >
-                                                                        <div className="top_drawer_log_msg_bubble">
+                                                                        <div
+                                                                            style={{
+                                                                                ...styles.msgBubble,
+                                                                                background:
+                                                                                    m.side ===
+                                                                                    "other"
+                                                                                        ? "#4A90E2"
+                                                                                        : "#F0F0F0",
+                                                                                borderColor:
+                                                                                    m.side ===
+                                                                                    "other"
+                                                                                        ? "#4A90E2"
+                                                                                        : "rgba(0,0,0,0.10)",
+                                                                                color:
+                                                                                    m.side ===
+                                                                                    "other"
+                                                                                        ? "#FFFFFF"
+                                                                                        : "#333",
+                                                                            }}
+                                                                        >
                                                                             {
                                                                                 m.text
                                                                             }
                                                                             {m.side ===
                                                                                 "other" && (
                                                                                 <button
-                                                                                    className="top_drawer_log_msg_user_btn"
+                                                                                    style={
+                                                                                        styles.otherTag
+                                                                                    }
                                                                                     onClick={() =>
                                                                                         setSelectedUserId(
                                                                                             m.authorUserId,
@@ -1322,27 +1650,27 @@ export default function Top({
                                 </div>
                             </div>
                         ) : (
-                            <div className="top_drawer_list">
+                            <div style={styles.drawerList}>
                                 {usersView.map((u) => {
                                     const d = doingInfo(u.currentDoing);
                                     return (
                                         <button
                                             key={u.id}
-                                            className="top_drawer_user_row"
                                             onClick={() =>
                                                 onPickUserFromMenu(u.id)
                                             }
+                                            style={styles.userRow}
                                         >
                                             <span
-                                                className="top_drawer_user_dot"
                                                 style={{
+                                                    ...styles.userDot,
                                                     background: d.color,
                                                 }}
                                             />
-                                            <span className="top_drawer_user_name">
+                                            <span style={styles.userName}>
                                                 {u.name}
                                             </span>
-                                            <span className="top_drawer_user_doing">
+                                            <span style={styles.userDoing}>
                                                 {d.emoji} {d.label}
                                             </span>
                                         </button>
@@ -1355,15 +1683,15 @@ export default function Top({
             </div>
 
             {/* Bottom timeline */}
-            <div className="top_timeline">
-                <div className="top_timeline_label">Timeline</div>
+            <div style={styles.timeline}>
+                <div style={styles.timelineLabel}>Timeline</div>
 
-                <div className="top_timeline_marquee_wrap">
-                    <div className="top_timeline_marquee_inner">
+                <div style={styles.marqueeWrap}>
+                    <div style={styles.marqueeInner}>
                         {[...timeline, ...timeline].map((t, i) => (
                             <span
                                 key={`${t.id}-${i}`}
-                                className="top_timeline_item"
+                                style={styles.timelineItem}
                             >
                                 {t.text}
                             </span>

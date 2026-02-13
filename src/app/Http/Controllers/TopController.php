@@ -3,120 +3,268 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Theme;
+use App\Models\Room;
+use App\Models\DoingType;
+use App\Models\Doing;
+use App\Models\Topic;
 use App\Models\Comment;
+use App\Models\TopicComment;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class TopController extends Controller
 {
+	/**
+	 * 現在のユーザーIDを取得（MVP開発用メソッド）
+	 * 
+	 * MVP開発中: ログインなし/ありを柔軟に切り替えられる
+	 * 本番（認証必須後）: このメソッドは不要。コントローラーで直接 Auth::id() を使う
+	 */
+	private function getCurrentUserId(): ?int
+	{
+		// パターンA: user1固定（MVP用 - ログインなしでもコメント可能）
+		// return Auth::id() ?? 1;
+
+		// パターンB: ゲストモード（開発中の動作確認用 - ログインなしはコメント不可）
+		return Auth::id();
+	}
+
 	public function index(Request $request)
 	{
-		// ?day=20260104 があればそれを使う
 		$dayParam = $request->query('day');
 
 		if ($dayParam) {
-			// YYYYMMDD を想定
-			$targetDayJst = Carbon::createFromFormat(
-				'Ymd',
-				$dayParam,
-				'Asia/Tokyo'
-			);
+			$targetDayJst = Carbon::createFromFormat('Ymd', $dayParam, 'Asia/Tokyo');
 		} else {
 			$targetDayJst = Carbon::now('Asia/Tokyo');
 		}
 
 		$todayFormatted = $targetDayJst->format('Y年m月d日');
+		$today = $targetDayJst->toDateString();
 
-		// JSTの開始・終了 → UTC
-		$startUtc = $targetDayJst->copy()->startOfDay()->utc();
-		$endUtc   = $targetDayJst->copy()->endOfDay()->utc();
+		$room = Room::where('slug', 'main')->where('is_active', true)->first();
 
-		// テーマ関連の残骸
-		// $todayTheme = Theme::whereBetween('created_at', [$startUtc, $endUtc])
-		// 	->latest('created_at')
-		// 	->first();
+		// doing_types (system) 
+		// todo 将来的にsystemではないdoingも作成する
+		$doingTypes = DoingType::where('scope', 'system')
+			->where('is_active', true)
+			->orderBy('sort_order')
+			->get()
+			->map(fn($dt) => [
+				'key' => $dt->key,
+				'label' => $dt->label,
+				'emoji' => $dt->emoji,
+				'color' => $dt->color,
+				'moveChance' => (float) $dt->move_chance,
+				'moveDistance' => (int) $dt->move_distance,
+				'cssAnim' => $dt->css_anim,
+			])
+			->values();
 
-		// $comments = [];
-		// if ($todayTheme) {
-		// 	// var_dump('テーマID:' . $todayTheme->id);
-		// 	// exit;
-		// 	$comments = Comment::where('theme_id', $todayTheme->id)
-		// 		->latest('created_at')
-		// 		->get();
-		// }
-		// var_dump(($comments)->toArray());
+		// topics — 今日分（全件返す。フロントでローテーション）
+		$topics = $room
+			? Topic::where('room_id', $room->id)
+			->where('is_active', true)
+			->orderBy('starts_at')
+			->get()
+			->map(fn($t) => [
+				'id' => $t->id,
+				'title' => $t->title,
+				'desc' => $t->description,
+			])
+			->values()
+			: collect();
+
+		// users
+		$users = \App\Models\User::select('id', 'name')
+			->orderBy('id')
+			->get()
+			->map(fn($u) => ['id' => $u->id, 'name' => $u->name])
+			->values();
+
+		// currentUserId
+		// MVP開発中: getCurrentUserId() でゲスト/ユーザーモード切り替え可能
+		$currentUserId = $this->getCurrentUserId();
+		// 本番（認証必須後）: 直接 Auth::id() を使う方がシンプル
+		// $currentUserId = Auth::id();
+
+		// doings — 今日分（user_doings相当）
+		$doings = $room
+			? Doing::where('room_id', $room->id)
+			->where('day', $today)
+			->with('doingType')
+			->orderBy('started_at', 'desc')
+			->get()
+			->map(fn($d) => [
+				'id' => $d->id,
+				'user_id' => $d->user_id,
+				'doing_key' => $d->doingType->key,
+				'started_at' => $d->started_at->getTimestampMs(),
+				'is_current' => $d->is_current,
+			])
+			->values()
+			: collect();
+
+		// doingComments — doing紐付きコメント（今日分）
+		$doingComments = $room
+			? Comment::where('room_id', $room->id)
+			->where('day', $today)
+			->whereNotNull('doing_id')
+			->orderBy('created_at')
+			->get()
+			->map(fn($c) => [
+				'id' => $c->id,
+				'doing_id' => $c->doing_id,
+				'author_user_id' => $c->user_id,
+				'text' => $c->content,
+				'created_at' => $c->created_at->getTimestampMs(),
+			])
+			->values()
+			: collect();
+
+		// topicComments — topic_comments 経由
+		$topicComments = $room
+			? TopicComment::whereHas('topic', fn($q) => $q->where('room_id', $room->id))
+			->with('comment')
+			->get()
+			->map(fn($tc) => [
+				'id' => $tc->comment->id,
+				'topic_id' => $tc->topic_id,
+				'author_user_id' => $tc->comment->user_id,
+				'text' => $tc->comment->content,
+				'created_at' => $tc->comment->created_at->getTimestampMs(),
+			])
+			->values()
+			: collect();
 
 		return Inertia::render('Top', [
-			// 'todayTheme' => $todayTheme,
-			// 'comments' => $comments,
 			'todayFormatted' => $todayFormatted,
 			'day' => $targetDayJst->format('Ymd'),
+			'doingTypes' => $doingTypes,
+			'topics' => $topics,
+			'users' => $users,
+			'currentUserId' => $currentUserId,
+			'doings' => $doings,
+			'doingComments' => $doingComments,
+			'topicComments' => $topicComments,
+			'roomId' => $room?->id,
 		]);
 	}
 
-	public function canvas(Request $request)
-	{
-		return Inertia::render('Canvas', []);
-	}
+	// public function canvas(Request $request)
+	// {
+	// 	return Inertia::render('Canvas', []);
+	// }
 
-	// コメント保存
-	public function store(Request $request)
+	/**
+	 * doing 切り替え
+	 */
+	public function switchDoing(Request $request)
 	{
 		$data = $request->validate([
-			'day' => ['required', 'date_format:Ymd'],
-			'name' => ['nullable', 'string', 'max:30'],
-			'body' => ['required', 'string', 'max:200'],
-			'gender' => ['required', 'in:unknown,male,female,other'],
-			'age_range' => ['required', 'in:10s,20s,30s,40s,50s,60s+'],
-			'avatar_id' => ['nullable', 'integer', 'min:1', 'max:100'],
+			'doing_type_key' => ['required', 'string', 'max:64'],
 		]);
 
+		$userId = $this->getCurrentUserId();
+		$room = Room::where('slug', 'main')->where('is_active', true)->firstOrFail();
+		$today = Carbon::now('Asia/Tokyo')->toDateString();
 
-		// YYYYMMDD → JST の日付
-		$targetDayJst = Carbon::createFromFormat(
-			'Ymd',
-			$data['day'],
-			'Asia/Tokyo'
-		);
+		$doingType = DoingType::where('key', $data['doing_type_key'])
+			->where('scope', 'system')
+			->where('is_active', true)
+			->firstOrFail();
 
-		// JST の開始・終了 → UTC
-		$startUtc = $targetDayJst->copy()->startOfDay()->utc();
-		$endUtc   = $targetDayJst->copy()->endOfDay()->utc();
+		// 現在の doing を終了
+		Doing::where('user_id', $userId)
+			->where('room_id', $room->id)
+			->where('day', $today)
+			->where('is_current', true)
+			->update([
+				'is_current' => false,
+				'ended_at' => Carbon::now(),
+			]);
 
-
-		// var_dump($startUtc->toDateTimeString()); // "2026-01-06 15:00:00"
-		// var_dump($endUtc->toDateTimeString());   // "2026-01-07 14:59:59"
-		// exit;
-
-		// string(19) "2026-01-06 15:00:00" string(19) "2026-01-07 14:59:59" 
-
-		// その日の Theme を取得（index と完全に同じ条件）
-		$theme = Theme::whereBetween('created_at', [$startUtc, $endUtc])
-			->latest('created_at')
-			->first();
-
-		// 万が一 Theme がない場合
-		if (!$theme) {
-			return redirect()
-				->route('top', ['day' => $data['day']])
-				->with('error', '今日のお題が見つかりませんでした');
-		}
-
-		// Comment 保存
-		Comment::create([
-			'theme_id'  => $theme->id,
-			'user_id'   => null, // 将来ログイン対応するならここに auth()->id()
-			'name'      => $data['name'] ?: '匿名',
-			'body'      => $data['body'],
-			'gender'    => $data['gender'],
-			'age_range' => $data['age_range'],
-			'avatar_id' => $data['avatar_id'] ?? null,
+		// 新しい doing を作成
+		$doing = Doing::create([
+			'user_id' => $userId,
+			'room_id' => $room->id,
+			'doing_type_id' => $doingType->id,
+			'day' => $today,
+			'started_at' => Carbon::now(),
+			'is_current' => true,
 		]);
 
-		// 同じ日付の Top に戻す（→ index が再実行される）
-		return redirect()->route('top', [
-			'day' => $data['day'],
+		return response()->json([
+			'id' => $doing->id,
+			'user_id' => $doing->user_id,
+			'doing_key' => $doingType->key,
+			'started_at' => $doing->started_at->getTimestampMs(),
+			'is_current' => true,
+		]);
+	}
+
+	/**
+	 * doing へのコメント投稿
+	 */
+	public function storeDoingComment(Request $request)
+	{
+		$data = $request->validate([
+			'doing_id' => ['required', 'integer', 'exists:doings,id'],
+			'content' => ['required', 'string', 'max:500'],
+		]);
+
+		$userId = $this->getCurrentUserId();
+		$doing = Doing::findOrFail($data['doing_id']);
+
+		$comment = Comment::create([
+			'room_id' => $doing->room_id,
+			'user_id' => $userId,
+			'day' => $doing->day,
+			'doing_id' => $doing->id,
+			'content' => $data['content'],
+		]);
+
+		return response()->json([
+			'id' => $comment->id,
+			'doing_id' => $comment->doing_id,
+			'author_user_id' => $comment->user_id,
+			'text' => $comment->content,
+			'created_at' => $comment->created_at->getTimestampMs(),
+		]);
+	}
+
+	/**
+	 * topic へのコメント投稿
+	 */
+	public function storeTopicComment(Request $request)
+	{
+		$data = $request->validate([
+			'topic_id' => ['required', 'integer', 'exists:topics,id'],
+			'content' => ['required', 'string', 'max:500'],
+		]);
+
+		$userId = $this->getCurrentUserId();
+		$topic = Topic::findOrFail($data['topic_id']);
+
+		$comment = Comment::create([
+			'room_id' => $topic->room_id,
+			'user_id' => $userId,
+			'day' => Carbon::now('Asia/Tokyo')->toDateString(),
+			'content' => $data['content'],
+		]);
+
+		TopicComment::create([
+			'topic_id' => $topic->id,
+			'comment_id' => $comment->id,
+		]);
+
+		return response()->json([
+			'id' => $comment->id,
+			'topic_id' => $topic->id,
+			'author_user_id' => $comment->user_id,
+			'text' => $comment->content,
+			'created_at' => $comment->created_at->getTimestampMs(),
 		]);
 	}
 }
